@@ -55,6 +55,8 @@ npm ci
 npm run web
 ```
 
+For the complete localhost walkthrough, see [Localhost testing](docs/LOCALHOST.md).
+
 For local online features, follow [generation setup](docs/GENERATION-SETUP.md) to create a private environment file and creator invite, then run the service and app in separate terminals:
 
 ```sh
