@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["FanStickersModule"] },
+  "android": { "modules": ["studio.bias.stickers.FanStickersModule"] }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "fan-stickers",
+  "version": "1.0.0",
+  "description": "On-device person cutout and WhatsApp pack handoff for Bias Studio",
+  "license": "MIT",
+  "main": "index.js",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

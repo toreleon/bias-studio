@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "bias-studio",
+    "name": "Bias Studio",
     "slug": "bias-studio",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,21 +10,41 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FBFAFC"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "studio.bias.app",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["whatsapp"],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#F0E7FB"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "studio.bias.app",
+      "blockedPermissions": ["android.permission.RECORD_AUDIO"],
+      "allowBackup": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose photos and videos to turn into your own stickers.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "scheme": "biasstudio"
   }
 }
