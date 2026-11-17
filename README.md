@@ -114,7 +114,7 @@ The six domain tests cover pack limits, invalid assets, immutable edits, stored-
 - Web, iOS, and Android JavaScript bundles exported successfully. This verifies bundling, not native compilation.
 - Expo prebuild succeeded for Android and iOS; autolinking found both native module implementations.
 - Android release APK packaging and native compilation succeeded against Android SDK 36. APK signature verification passed. The test APK targets arm64 phones, includes its JavaScript bundle, and uses the template debug signing key. It is a local test build; production distribution needs your own signing configuration.
-- Native device tests are still required. This Linux workspace has no Xcode or attached phone. iOS native compilation and actual WhatsApp acceptance have not been established here.
+- The iOS Release Simulator app compiled successfully on GitHub Actions. Physical-device cutout quality and WhatsApp acceptance still need hands-on verification; this Linux workspace has no attached phone.
 - Expo Doctor passed all 18 checks after using the environment proxy and correcting the native module peer declaration. `expo install --check` found dependency versions compatible.
 
 ## Device acceptance checklist
@@ -147,7 +147,7 @@ Native source images are not persisted in the library after rendering. Rendered 
 
 ## Next development steps
 
-The immediate next step is native compilation and the device acceptance checklist above. Before a public release, choose final branding and identifiers, test across phone sizes and OS versions, replace demo app icons if desired, and prepare store privacy details and screenshots.
+The immediate next steps are the physical-device acceptance checklist above and activation of the repository protections documented in docs/RELEASING.md. Before a public release, choose final branding and identifiers, test across phone sizes and OS versions, replace demo app icons if desired, and prepare store privacy details and screenshots.
 
 Known first-version limits:
 

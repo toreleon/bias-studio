@@ -6,7 +6,11 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: !!process.env.CI,
   reporter: process.env.CI
-    ? [["line"], ["html", { open: "never" }], ["junit", { outputFile: "test-results/e2e.xml" }]]
+    ? [
+        ["line"],
+        ["html", { open: "never" }],
+        ["junit", { outputFile: "test-results/e2e.xml" }],
+      ]
     : "list",
   use: {
     baseURL: "http://localhost:8081",

@@ -6,13 +6,13 @@ The repository builds and tests both native platforms before a candidate is elig
 
 `CI` runs on every pull request, main push, merge-queue event, or manual request. There are no path filters that silently skip required checks.
 
-| Job | Gate |
-| --- | --- |
-| Quality | Lockfile installation, workflow syntax/security audits, lint with zero warnings, TypeScript, domain tests, release-policy tests |
-| Browser and web build | Chromium end-to-end scenarios, no flaky-test passes, production web export |
-| Android native build | Generate the native project, compile the ARM64 release variant, run Android release lint, verify APK signing |
-| iOS native build | Generate the native project, install CocoaPods, compile an unsigned Release app for Simulator on macOS |
-| CI gate | Fails if any required job failed, was cancelled, or was skipped |
+| Job                   | Gate                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Quality               | Lockfile installation, workflow syntax/security audits, lint with zero warnings, TypeScript, domain tests, release-policy tests |
+| Browser and web build | Chromium end-to-end scenarios, no flaky-test passes, production web export                                                      |
+| Android native build  | Generate the native project, compile the ARM64 release variant, run Android release lint, verify APK signing                    |
+| iOS native build      | Generate the native project, install CocoaPods, compile an unsigned Release app for Simulator on macOS                          |
+| CI gate               | Fails if any required job failed, was cancelled, or was skipped                                                                 |
 
 Native builds are intentional gates rather than JavaScript-export substitutes. The CI Android artifact is explicitly a **test APK signed with the template debug key**. The iOS artifact is explicitly an **unsigned Simulator app**. Production signing remains separate.
 
@@ -53,7 +53,7 @@ Use the confirmation only after performing those tests. The workflow also refuse
 
 After eligibility passes, approve the pending `release` environment deployment in GitHub. The job downloads the original successful CI artifacts, verifies every file's source SHA, run ID, app version, size and SHA-256 against its build manifest, then rechecks main and protection settings after approval. It creates a new tag at that exact source SHA and a **draft prerelease**, with the APK, Simulator zip, browser-preview zip, checksum file, and build evidence. It never overwrites an existing tag or release, rebuilds a different artifact after approval, or uploads to an app store.
 
-Artifacts expire after 14 days. Rerun CI for the current main commit if necessary. A newer failed/pending CI run blocks eligibility even if an older run passed.
+Artifact names and manifests include the CI run attempt, so retries cannot overwrite or silently mix earlier artifacts. Rerun all jobs, rather than only failed jobs, when preparing a release candidate. A CI rerun during approval invalidates that approval cycle. Artifacts expire after 14 days. Rerun CI for the current main commit if necessary. A newer failed/pending CI run blocks eligibility even if an older run passed.
 
 ## Production remains closed
 

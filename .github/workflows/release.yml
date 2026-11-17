@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Candidate tag matching app version, e.g. v1.0.0-rc.1'
+        description: "Candidate tag matching app version, e.g. v1.0.0-rc.1"
         required: true
         type: string
       device_smoke_passed:
-        description: 'I verified person cutout and WhatsApp pack import on Android and iPhone for this commit'
+        description: "I verified person cutout and WhatsApp pack import on Android and iPhone for this commit"
         required: true
         default: false
         type: boolean
@@ -32,13 +32,14 @@ jobs:
       sha: ${{ steps.policy.outputs.sha }}
       tag: ${{ steps.policy.outputs.tag }}
       ci_run_id: ${{ steps.policy.outputs.ci_run_id }}
+      ci_run_attempt: ${{ steps.policy.outputs.ci_run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: "22"
       - name: Require current main, green CI, available artifacts, and a configured human approval
         id: policy
         env:
@@ -62,6 +63,7 @@ jobs:
       SOURCE_SHA: ${{ needs.eligibility.outputs.sha }}
       RELEASE_TAG: ${{ needs.eligibility.outputs.tag }}
       CI_RUN_ID: ${{ needs.eligibility.outputs.ci_run_id }}
+      CI_RUN_ATTEMPT: ${{ needs.eligibility.outputs.ci_run_attempt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,17 +71,17 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: "22"
       - name: Download the exact successful CI artifacts
         run: |
-          gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name android-test --dir incoming/android
-          gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name ios-simulator --dir incoming/ios
-          gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name web-preview --dir incoming/web
+          gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name "android-test-$CI_RUN_ATTEMPT" --dir incoming/android
+          gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name "ios-simulator-$CI_RUN_ATTEMPT" --dir incoming/ios
+          gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name "web-preview-$CI_RUN_ATTEMPT" --dir incoming/web
       - name: Verify source, version, and checksums
         run: node scripts/verify-release-artifacts.mjs
       - name: Recheck main and approval configuration after review
         env:
-          DEVICE_SMOKE_PASSED: 'true'
+          DEVICE_SMOKE_PASSED: "true"
         run: node scripts/release-policy.mjs
       - name: Create a draft prerelease for final inspection
         run: |

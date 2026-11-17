@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CI: 'true'
+  CI: "true"
   NODE_ENV: production
-  EXPO_NO_TELEMETRY: '1'
+  EXPO_NO_TELEMETRY: "1"
 
 jobs:
   quality:
@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
       - run: npm ci --include=dev
       - name: Validate workflow syntax and security
@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
       - run: npm ci --include=dev
       - run: npx playwright install --with-deps chromium
@@ -61,7 +61,7 @@ jobs:
           node scripts/build-manifest.mjs web artifacts/web/bias-studio-web-preview.zip
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: web-preview
+          name: web-preview-${{ github.run_attempt }}
           path: artifacts/web/
           if-no-files-found: error
           retention-days: 14
@@ -69,7 +69,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: browser-test-results
+          name: browser-test-results-${{ github.run_attempt }}
           path: |
             test-results/
             playwright-report/
@@ -86,20 +86,22 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - run: npm ci --include=dev
       - name: Install Android build tools
         run: |
-          printf 'y\n%.0s' {1..100} | sdkmanager --licenses > /dev/null
-          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+          SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDK_MANAGER"
+          printf 'y\n%.0s' {1..100} | "$SDK_MANAGER" --licenses > /dev/null
+          "$SDK_MANAGER" 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
       - run: npx expo prebuild --platform android --no-install
       - name: Compile native app and run Android release lint
         working-directory: android
@@ -114,7 +116,7 @@ jobs:
           node scripts/build-manifest.mjs android-test artifacts/android/bias-studio-arm64-test.apk
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: android-test
+          name: android-test-${{ github.run_attempt }}
           path: artifacts/android/
           if-no-files-found: error
           retention-days: 14
@@ -129,7 +131,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
       - run: npm ci --include=dev
       - name: Show native toolchain
@@ -150,7 +152,7 @@ jobs:
           node scripts/build-manifest.mjs ios-simulator artifacts/ios/bias-studio-ios-simulator.zip
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ios-simulator
+          name: ios-simulator-${{ github.run_attempt }}
           path: artifacts/ios/
           if-no-files-found: error
           retention-days: 14
