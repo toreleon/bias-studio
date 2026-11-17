@@ -1,16 +1,17 @@
 # Revamp verification and device acceptance
 
-Verification date: 17 November 2026. Scope: the creator-workspace revamp (app version 1.1.0). Refer to the PR's CI gate for results at its exact commit; an older main CI result does not validate these changes.
+Verification date: 17 November 2026. Scope: the creator workspace and generative studio (app version 1.2.0). Refer to the PR's CI gate for results at its exact commit; an older main CI result does not validate these changes.
 
 ## Automated coverage
 
-- 15 domain/workspace tests: pack constraints, immutable updates, schema validation, SVG escaping, v1 migration, selective batch styling, independent reuse, search, portable archive round trip/rejection, serialized persistence/retry, and failed/retried destination handoff.
-- 10 Chromium end-to-end workflows: multi-photo creation; saved-style and reaction reuse after reload; multiple video frames/timestamps; individual overrides, erase/restore/undo/reorder; real ZIP/WebP export and reimport; migration preserving the v1 key; storage-full retry; export-failure retry; unreadable-data preservation; 390px mobile screenshots; and pixel-level verification that erase makes image pixels transparent and restore recovers the original pixels. The multi-part cases overlap these concerns.
+- 19 domain/workspace/client tests: creation validation, backward compatibility for v2, recipe reuse, generated-result validation, plus pack constraints, immutable updates, schema validation, SVG escaping, v1 migration, selective batch styling, independent reuse, search, portable archive round trip/rejection, serialized persistence/retry, and failed/retried destination handoff.
+- 14 Chromium end-to-end workflows: partial generation failure and retry, cancellation with no automatic retry, imported-result provenance, independent recipe/output reuse, 320–430px creation layouts, plus multi-photo creation; saved-style and reaction reuse after reload; multiple video frames/timestamps; individual overrides, erase/restore/undo/reorder; real ZIP/WebP export and reimport; migration preserving the v1 key; storage-full retry; export-failure retry; unreadable-data preservation; 390px mobile screenshots; and pixel-level verification that erase makes image pixels transparent and restore recovers the original pixels. The multi-part cases overlap these concerns.
+- 5 server tests: authentication/origin enforcement, input validation, quota rejection, missing-provider/error handling and generation/reference-edit API contracts.
 - 8 unchanged release-policy tests: source/ref/version/protection/signoff requirements, correct latest CI proof, required approval/branch restrictions, artifact uniqueness/expiry and checksum/source integrity.
 - Lint with zero warnings and TypeScript. Type checking explicitly excludes generated native/build/export trees.
 - Production web export, Android Release ARM64 native compilation/release lint/signature checks, and iOS Release Simulator native compilation in the existing CI workflow.
 
-The browser suite measures functional correctness. It does not measure creator retention or prove that the second pack is faster for real users. Screenshots use original demo art and are mobile browser captures.
+The browser suite measures functional correctness. It does not measure creator retention or prove that the second pack is faster for real users. Screenshots are mobile browser captures. The new AI screenshots use real GPT Image outputs from the live pilot; older workspace screenshots use original illustrative demo art. Automated generation tests intercept requests with fixtures and never call a paid provider.
 
 ## Native export review
 
@@ -42,3 +43,11 @@ No phone is attached to the development workspace. Linux cannot run iOS hardware
 GitHub CI uploads `android-test-<attempt>`, `ios-simulator-<attempt>` and `web-preview-<attempt>`, each with source/run/version/checksum evidence. Download the artifacts from the revamp PR's successful CI run. The Android APK is signed with the template debug key and intended for ARM64 test phones. The iOS ZIP contains an unsigned Simulator `.app`, not an iPhone IPA. Browser diagnostics and screenshots are in `browser-test-results-<attempt>`.
 
 Local test output is also provided in the task's output directory. Follow [RELEASING.md](RELEASING.md) for a future candidate. This implementation does not bypass review, dispatch a release, sign a production build, publish public collection pages or submit to stores.
+
+## Live GPT Image pilot — 17 November 2026
+
+The actual provider returned `gpt-image-1.5` output through the server adapter. A three-reaction batch used the same fictional lavender-cat reference and ran through the browser UI. It survived page reload, accepted an edited caption, created three pack items and three library assets, exported the editable ZIP, and reused the recipe into a fresh creation with zero inherited candidates. No celebrity reference or private fandom photos were used for the test.
+
+The exported images are 512×512 WebP, with sizes 55,288 / 61,986 / 55,344 bytes and alpha ranges 0–255. All are under the 100 KiB WhatsApp image ceiling. This verifies the generated assets and browser export, not physical-device installation. Live testing used seven successful low-quality image requests in total: one initial text generation and two reference-based batches of three. The first batch exposed localStorage quota exhaustion when duplicating PNGs into both library and pack; the fixed flow compacts browser sources to transparent WebP and passed the repeated acceptance flow.
+
+The service runs locally in this workspace, not at a deployed public HTTPS endpoint. Before live generation on phones, deploy the service and rebuild with its URL. Verify native image decoding, keyboard behavior, cancel/background/relaunch, poor connectivity, provider refusals and quota errors on both platforms. Do not ship the pilot access code or model key in a bundle.

@@ -6,6 +6,16 @@ A mobile-first creator workspace for iPhone and Android, built on Expo SDK 54 / 
 
 [![CI](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml)
 
+## Generative reaction studio (1.2)
+
+Create with AI → subject/reference → visual direction + reaction lineup → compare favorites → editable pack → chat preview/export. Recipes save automatically and can be reused through Home or Library → AI recipes. In-app generation requires the optional server connection; disconnected builds support briefs and importing results without pretending generation succeeded.
+
+- [Mobile competitor UX research and design decisions](docs/GENERATIVE-UX-RESEARCH.md)
+- [GPT Image service setup and phone deployment](docs/GENERATION-SETUP.md)
+- [Verification and remaining real-device checks](docs/VERIFICATION.md)
+
+The live browser pilot generated three reference-based reactions with `gpt-image-1.5`, reopened them, made a pack, saved the library assets, exported a ZIP and reused the recipe. Automated tests use fixture responses and make no paid provider calls.
+
 ## What works
 
 - Start immediately, name later, and resume automatically saved, editable drafts.
@@ -18,11 +28,21 @@ A mobile-first creator workspace for iPhone and Android, built on Expo SDK 54 / 
 - Export one portable ZIP containing editable designs, original/cutout images, captions, tags, timestamps, creator credit, collection identity and ready-rendered WebP stickers. Import it on another installation through **Packs → Import pack file**.
 - Preserve v1 packs and the original storage key during migration. Legacy stickers remain reusable as flattened images; their baked-in text cannot be independently edited.
 
-Automatic person cutout uses Apple Vision on iOS and bundled ML Kit person segmentation on Android. Manual correction works on both platforms and in the browser. There is no animated output, account, backend, public page, cloud sync, marketplace or subscription. Unpublished work stays on the device. A shared ZIP deliberately contains the editable source assets; the app explains this before sharing.
+Automatic person cutout uses Apple Vision on iOS and bundled ML Kit person segmentation on Android. Manual correction works on both platforms and in the browser. There is no animated output, production account system, public page, cloud sync, marketplace or subscription. An optional controlled-pilot generation server is included. Drafts stay on the device; generation uploads only the description and reference after explicit confirmation. A shared ZIP deliberately contains the editable source assets; the app explains this before sharing.
 
 ## Main screens
 
 Actual 390px mobile **browser** captures of the implemented app; these are not physical-device screenshots.
+
+The AI screenshots below use actual GPT Image results from the live test, not fixture output.
+
+| Idea and reference | Visual direction | Generated favorites |
+| --- | --- | --- |
+| <img src="docs/screenshots/ai/02-idea.png" width="220" alt="Saved subject and reference composer" /> | <img src="docs/screenshots/ai/03-look.png" width="220" alt="Visual styles and reaction choices" /> | <img src="docs/screenshots/ai/04-results.png" width="220" alt="Three actual GPT Image reactions with favorite selection" /> |
+
+| Pack preview | Reusable recipes |
+| --- | --- |
+| <img src="docs/screenshots/ai/07-chat.png" width="220" alt="AI reactions in chat preview" /> | <img src="docs/screenshots/ai/08-recipes.png" width="220" alt="Saved AI recipes in the library" /> |
 
 | Home | Reaction library | Pack |
 | --- | --- | --- |

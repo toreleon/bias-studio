@@ -197,3 +197,23 @@ export async function shareSticker(sticker: Sticker) {
 export async function discardSticker(_sticker: Sticker) {
   /* Data URLs are released with the unsaved draft. */
 }
+
+export async function prepareGeneratedImage(uri: string): Promise<string> {
+  const image = await loadImage(uri);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 512;
+  const scale = Math.min(512 / image.width, 512 / image.height);
+  canvas
+    .getContext("2d")!
+    .drawImage(
+      image,
+      (512 - image.width * scale) / 2,
+      (512 - image.height * scale) / 2,
+      image.width * scale,
+      image.height * scale,
+    );
+  const compact = canvas.toDataURL("image/webp", 0.92);
+  return compact.startsWith("data:image/webp")
+    ? compact
+    : canvas.toDataURL("image/png");
+}

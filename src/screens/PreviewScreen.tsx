@@ -207,8 +207,8 @@ export function PreviewScreen() {
         {sharing && (
           <>
             <T style={v.sub}>
-              This file includes original photos, cutouts, captions, tags and
-              video timestamps. Share it only with people you want to give these
+              This file includes original photos, cutouts, captions, tags,
+              video timestamps and AI creation descriptions. Share it only with people you want to give these
               assets to. It does not create a public page or install a chat
               pack.
             </T>

@@ -1,6 +1,6 @@
 # Creator workspace architecture
 
-Expo Router owns routes under `src/app/`: Home, Library, Packs, Pack `[id]`, Edit `[id]?item=…`, Preview `[id]`. `_layout` provides fonts, safe area and a shared workspace provider. Non-route UI lives in `src/screens` and shared controls. Generated native projects remain untracked.
+Expo Router owns routes under `src/app/`: Home, Library, Packs, Create `[id]`, Pack `[id]`, Edit `[id]?item=…`, Preview `[id]`. `_layout` provides fonts, safe area and a shared workspace provider. Non-route UI lives in `src/screens` and shared controls. Generated native projects remain untracked.
 
 ## Data and migration
 
@@ -36,3 +36,15 @@ This is an editable collection transfer format, not a WhatsApp install protocol 
 Storage errors leave edits visible and retryable. Decoding/rendering or destination errors leave the draft intact. Invalid pack imports never replace existing data. Source files staged before a failed import can remain as unreachable private files; they are not published. WhatsApp snapshots are retained for its content-provider reads and may create new installed revisions after edits. Native share-sheet completion/cancellation is not a reliable delivery receipt.
 
 `docs/RELEASING.md` and the existing CI/release policy remain the release authority. Public hosting, production signing, store submission and additional messaging destinations are separate work.
+
+## Generative creation (1.2)
+
+Schema v2 gains an optional `creations` array; old v2 data and v1 migration remain valid. Creation records hold a recipe (subject, optional reference, look, reaction lineup, caption preference), candidates, selection, update time and saved-recipe flag. Reactions can carry generated/imported provenance and model attribution. Generated images remain raster sources; captions and composition are editable, not the model's internal illustration layers.
+
+`creation/model.ts` validates drafts and builds one-reaction instructions; `creation/client.ts` defines a narrow service contract. `server/generation.mjs` supplies the authenticated OpenAI Images adapter. There are no mobile provider credentials. Server settings, runtime code entry and the actual provider response are separate from persisted recipes. The client requests sequentially, persists each successful result, and never retries paid work automatically. Cancel aborts locally and stops future requests, with no promise that the provider stopped billing.
+
+Browser generated images and references are normalized to 512px WebP; native sources become PNG files in document storage. This prevents the first set plus its library/pack copies from exhausting common localStorage quotas. Browser quota is still finite and large libraries require exported backups or future blob/IndexedDB storage. The save queue surfaces quota failures with a retry message; the app does not silently discard old packs.
+
+Each accepted candidate produces a new reaction ID in a fresh pack and an independent library snapshot. A saved recipe starts a new creation with no previous candidates. Native files may be shared by URI but design edits do not overwrite those files. Generated provenance labels persist across library reuse and ZIP transfer; private source references and unfinished candidate drafts are not added to a shared pack.
+
+Production generation hosting and user authentication are not provisioned here. See [GENERATION-SETUP.md](GENERATION-SETUP.md) for the controlled-pilot contract, process-local quotas and remaining deployment requirements.

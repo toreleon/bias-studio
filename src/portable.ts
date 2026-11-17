@@ -38,7 +38,7 @@ export async function encodeCollection(
   const files: Record<string, Uint8Array> = {
     "collection.json": payload,
     "READ-ME.txt": strToU8(
-      "Open this ZIP with Import pack file in Bias Studio to edit or add it to WhatsApp. The stickers folder contains WebP images. Sharing this file does not install a sticker pack. Creator credit is in collection.json. Original photos and editable designs are included; share only when you intend to share them.",
+      "Open this ZIP with Import pack file in Bias Studio to edit or add it to WhatsApp. The stickers folder contains WebP images. Sharing this file does not install a sticker pack. Creator credit is in collection.json. Original photos, editable designs and AI creation descriptions are included; share only when you intend to share them.",
     ),
   };
   for (let i = 0; i < stickers.length; i++)

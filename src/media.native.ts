@@ -217,3 +217,16 @@ export async function shareSticker(sticker: Sticker) {
 export async function discardSticker(sticker: Sticker) {
   await FS.deleteAsync(sticker.uri, { idempotent: true });
 }
+
+export async function prepareGeneratedImage(uri: string): Promise<string> {
+  const resized = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 512, height: 512 } }],
+    { format: ImageManipulator.SaveFormat.PNG },
+  );
+  try {
+    return await persistImage(resized.uri);
+  } finally {
+    await FS.deleteAsync(resized.uri, { idempotent: true }).catch(() => {});
+  }
+}

@@ -1,3 +1,9 @@
+import {
+  Creation,
+  Provenance,
+  validCreation,
+  validProvenance,
+} from "./creation/model";
 import { defaultDesign, isLibrary, newId, Pack, StickerDesign } from "./domain";
 
 export type Tags = {
@@ -13,6 +19,7 @@ export type Reaction = {
   createdAt: number;
   source?: { name: string; seconds?: number };
   legacy?: boolean;
+  provenance?: Provenance;
 };
 export type Collection = {
   id: string;
@@ -41,6 +48,7 @@ export type Workspace = {
   collections: Collection[];
   assets: Reaction[];
   styles: SavedStyle[];
+  creations?: Creation[];
 };
 export const emptyWorkspace = (): Workspace => ({
   version: 2,
@@ -233,6 +241,7 @@ export function validReaction(v: unknown): v is Reaction {
     return false;
   const d: Record<string, any> = v.design;
   return (
+    (v.provenance === undefined || validProvenance(v.provenance)) &&
     imageURI(d.source) &&
     (d.source !== "" || d.sample !== undefined) &&
     (d.originalSource === undefined || imageURI(d.originalSource)) &&
@@ -301,6 +310,10 @@ export function validWorkspace(v: unknown): v is Workspace {
       (s: any) =>
         record(s) && id(s.id) && text(s.name, 64) && validStyle(s.style),
     ) &&
-    unique(v.styles)
+    unique(v.styles) &&
+    (v.creations === undefined ||
+      (Array.isArray(v.creations) &&
+        v.creations.every(validCreation) &&
+        unique(v.creations)))
   );
 }

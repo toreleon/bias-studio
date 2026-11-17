@@ -27,7 +27,7 @@ Home → photos/video moments → pack selection/style → individual refinement
 
 The current destination is WhatsApp native handoff. File sharing carries the complete collection but does not install it. Telegram and iMessage can get destination adapters after protocol/device work. Snapchat integration must use its supported sharing API, without claims of reusable chat-pack installation. Animated output is not offered.
 
-A broad feed, marketplace, proprietary AI model, subscriptions and team collaboration are intentionally deferred. No server, account system or public publishing was introduced for these flows.
+A broad feed, marketplace, proprietary AI model, subscriptions and team collaboration are intentionally deferred. The optional generation server supports a controlled pilot; there is still no production account system or public publishing service. See [generative UX research](GENERATIVE-UX-RESEARCH.md) for the added idea/reference → look/reactions → favorites → pack journey and the updated competitor evidence. Recipes preserve creative instructions for repeat use; live generation does not establish faster creation or market demand.
 
 ## Public collection pages: infrastructure still needed
 

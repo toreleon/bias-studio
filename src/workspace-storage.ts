@@ -28,6 +28,14 @@ export async function saveWorkspace(workspace: Workspace) {
     throw new Error(
       "This change could not be saved. Your previous workspace is safe.",
     );
-  await AsyncStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
+  try {
+    await AsyncStorage.setItem(WORKSPACE_KEY, JSON.stringify(workspace));
+  } catch (error) {
+    if (error instanceof Error && /quota/i.test(error.message))
+      throw new Error(
+        "Device storage is full. Your unsaved work is still open. Free space, then tap the save status to retry before closing.",
+      );
+    throw error;
+  }
 }
 export { SaveQueue } from "./save-queue";

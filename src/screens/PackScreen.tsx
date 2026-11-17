@@ -32,6 +32,7 @@ import { defaultDesign, StickerDesign } from "../domain";
 import { Media, pickMany, videoFrame } from "../media";
 import { StyleControls } from "../StyleControls";
 import Slider from "../Range";
+import { takeImport } from "../import-inbox";
 
 type Frame = { uri: string; seconds: number };
 export function PackScreen() {
@@ -70,7 +71,7 @@ export function PackScreen() {
           throw new Error(
             "This pack has 30 reactions. Start another pack for more.",
           );
-        const media = await pickMany(kind, remaining);
+        const media = takeImport(id) ?? (await pickMany(kind, remaining));
         if (!media.length) return;
         if (kind === "photo") {
           const items = media.map((m) =>

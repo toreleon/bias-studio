@@ -22,6 +22,7 @@ import { Button, T } from "./ui";
 
 type Store = {
   data: Workspace;
+  snapshot: () => Workspace;
   change: (fn: (old: Workspace) => Workspace) => void;
   updatePack: (id: string, fn: (pack: Collection) => Collection) => void;
   undo: () => void;
@@ -215,6 +216,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     <Context.Provider
       value={{
         data,
+        snapshot: () => current.current,
         change,
         updatePack,
         undo,

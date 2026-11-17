@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Pressable,
   ScrollView,
@@ -199,11 +199,19 @@ export function Shell({
   children,
   back,
   tab = true,
+  footer,
+  scrollKey,
 }: {
   children: React.ReactNode;
   back?: () => void;
   tab?: boolean;
+  footer?: React.ReactNode;
+  scrollKey?: number;
 }) {
+  const scroller = useRef<ScrollView>(null);
+  useEffect(() => {
+    scroller.current?.scrollTo({ y: 0, animated: false });
+  }, [scrollKey]);
   const path = usePathname();
   const store = useWorkspace();
   return (
@@ -261,11 +269,28 @@ export function Shell({
         </View>
       </View>
       <ScrollView
+        ref={scroller}
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ flexGrow: 1 }}
       >
         <View style={v.page}>{children}</View>
       </ScrollView>
+      {footer && (
+        <View
+          style={{
+            paddingHorizontal: 22,
+            paddingTop: 12,
+            width: "100%",
+            maxWidth: 720,
+            alignSelf: "center",
+            borderTopWidth: 1,
+            borderTopColor: K.line,
+          }}
+        >
+          {footer}
+        </View>
+      )}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={store.status}
@@ -447,6 +472,9 @@ export function ReactionTile({
         >
           {item.design.caption || item.source?.name || "Add a caption"}
         </T>
+        {item.provenance?.kind === "generated" && (
+          <T style={{ fontSize: 10, color: K.purple }}>AI GENERATED</T>
+        )}
         {item.source?.seconds !== undefined && (
           <T style={v.small}>{item.source.seconds.toFixed(1)}s</T>
         )}

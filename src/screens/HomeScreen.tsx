@@ -6,6 +6,7 @@ import {
   Clapperboard,
   ImagePlus,
   Plus,
+  Sparkles,
 } from "lucide-react-native";
 import { Action, K, PackCard, Shell, v } from "../CreatorUI";
 import { Art, T } from "../ui";
@@ -14,19 +15,37 @@ import { newCollection, reaction } from "../workspace";
 import { defaultDesign } from "../domain";
 import { decodeCollection } from "../portable";
 import { pickPackFile } from "../pack-file";
-import { persistImage } from "../media";
+import { newCreation, reuseRecipe } from "../creation/model";
+import { persistImage, pickMany } from "../media";
+import { stageImport } from "../import-inbox";
 function useStart() {
   const store = useWorkspace();
-  return (kind?: string) => {
-    const pack = newCollection();
-    store.change((old) => ({
-      ...old,
-      collections: [pack, ...old.collections],
-    }));
-    router.push({
-      pathname: "/pack/[id]",
-      params: { id: pack.id, ...(kind ? { import: kind } : {}) },
+  return async (kind?: "photo" | "video") => {
+    const open = (pack: ReturnType<typeof newCollection>) => {
+      store.change((old) => ({
+        ...old,
+        collections: [pack, ...old.collections],
+      }));
+      router.push({
+        pathname: "/pack/[id]",
+        params: { id: pack.id, ...(kind ? { import: kind } : {}) },
+      });
+    };
+    if (!kind) {
+      open(newCollection());
+      return;
+    }
+    // Open the system picker directly from the tap, before navigation loses activation.
+    let prepared: ReturnType<typeof newCollection> | undefined;
+    await store.run("Opening your media…", async () => {
+      const media = await pickMany(kind);
+      if (!media.length) return;
+      const pack = newCollection();
+      stageImport(pack.id, media);
+      prepared = pack;
     });
+    // Release the global operation lock before the destination consumes the media.
+    if (prepared) open(prepared);
   };
 }
 export function HomeScreen() {
@@ -35,6 +54,14 @@ export function HomeScreen() {
   const recent = [...store.data.collections]
     .sort((a, b) => b.updatedAt - a.updatedAt)
     .slice(0, 3);
+  function create() {
+    const draft = newCreation();
+    store.change((old) => ({
+      ...old,
+      creations: [draft, ...(old.creations || [])],
+    }));
+    router.push(`/create/${draft.id}`);
+  }
   function demo() {
     const pack = newCollection();
     pack.items = ["love", "hype", "happy"].map((m: any, i) =>
@@ -65,7 +92,7 @@ export function HomeScreen() {
         }}
       >
         <T style={[v.title, { color: "white", fontSize: 35, lineHeight: 39 }]}>
-          Big feelings.{"\n"}Little stickers.
+          Your ideas.{"\n"}A whole reaction pack.
         </T>
         <T
           style={{
@@ -75,8 +102,8 @@ export function HomeScreen() {
             maxWidth: 310,
           }}
         >
-          Turn your favorite moments into a reaction pack. Keep the good ones
-          for your next era.
+          Dream up a character. Bring a favorite face. Make a little collection
+          of every big feeling.
         </T>
         <View
           style={{
@@ -105,15 +132,17 @@ export function HomeScreen() {
             </View>
           ))}
         </View>
-        <Action
-          label="Start a reaction pack"
-          icon={Plus}
-          onPress={() => start()}
-        />
+        <Action label="Create with AI" icon={Sparkles} onPress={create} />
         <T style={{ textAlign: "center", fontSize: 11, color: "#DBD0EC" }}>
-          No name needed. Drafts save as you create.
+          Idea → look → favorites → your chat
         </T>
       </View>
+      <Action
+        secondary
+        label="Start a reaction pack"
+        icon={Plus}
+        onPress={() => start()}
+      />
       <View style={v.row}>
         <View style={{ flex: 1 }}>
           <Action
@@ -132,6 +161,47 @@ export function HomeScreen() {
           />
         </View>
       </View>
+      {!!store.data.creations?.length && (
+        <View style={{ gap: 12 }}>
+          <T style={v.section}>Your ideas, still blooming</T>
+          {[...store.data.creations]
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .slice(0, 3)
+            .map((d) => (
+              <View key={d.id} style={v.card}>
+                <T
+                  numberOfLines={2}
+                  style={{ fontSize: 17, fontFamily: "DMSans_700Bold" }}
+                >
+                  {d.prompt || "An idea in the making"}
+                </T>
+                <T style={v.small}>
+                  {d.candidates.length} results ·{" "}
+                  {d.saved ? "Saved recipe" : "Private creation draft"}
+                </T>
+                <Action
+                  secondary
+                  label="Resume creation"
+                  onPress={() => router.push(`/create/${d.id}`)}
+                />
+                {d.saved && (
+                  <Action
+                    secondary
+                    label="Reuse recipe"
+                    onPress={() => {
+                      const next = reuseRecipe(d);
+                      store.change((old) => ({
+                        ...old,
+                        creations: [next, ...(old.creations || [])],
+                      }));
+                      router.push(`/create/${next.id}`);
+                    }}
+                  />
+                )}
+              </View>
+            ))}
+        </View>
+      )}
       <View style={[v.row, { justifyContent: "space-between" }]}>
         <T style={v.section}>Pick up where you left off</T>
         <T style={v.small}>{store.data.collections.length} packs</T>
@@ -164,8 +234,8 @@ export function HomeScreen() {
         />
       </View>
       <T style={v.small}>
-        Private on this device until you choose to share. Demo art is original
-        illustration.
+        Drafts stay on this device. AI generation sends only the inputs you
+        confirm. Preview art is original illustration.
       </T>
     </Shell>
   );
