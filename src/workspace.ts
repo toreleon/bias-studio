@@ -234,6 +234,7 @@ export function validReaction(v: unknown): v is Reaction {
   const d: Record<string, any> = v.design;
   return (
     imageURI(d.source) &&
+    (d.source !== "" || d.sample !== undefined) &&
     (d.originalSource === undefined || imageURI(d.originalSource)) &&
     text(d.caption, 28) &&
     finite(d.zoom, 1, 3) &&

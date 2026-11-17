@@ -65,15 +65,29 @@ export async function pickMany(
   return items;
 }
 export async function persistImage(uri: string): Promise<string> {
+  if (uri.startsWith("data:")) {
+    // Decode shared media before it becomes a durable draft reference.
+    let decoded: ImageManipulator.ImageResult;
+    try {
+      decoded = await ImageManipulator.manipulateAsync(uri, [], {
+        format: ImageManipulator.SaveFormat.PNG,
+      });
+    } catch {
+      throw new Error(
+        "A shared image could not be read. Your existing workspace is unchanged.",
+      );
+    }
+    try {
+      return await persistImage(decoded.uri);
+    } finally {
+      await FS.deleteAsync(decoded.uri, { idempotent: true }).catch(() => {});
+    }
+  }
   const root = `${FS.documentDirectory}sources/`;
   if (uri.startsWith(root)) return uri;
   await FS.makeDirectoryAsync(root, { intermediates: true });
   const output = `${root}${newId()}.${uri.startsWith("data:image/webp") || uri.endsWith(".webp") ? "webp" : "png"}`;
-  if (uri.startsWith("data:"))
-    await FS.writeAsStringAsync(output, uri.split(",")[1], {
-      encoding: FS.EncodingType.Base64,
-    });
-  else await FS.copyAsync({ from: uri, to: output });
+  await FS.copyAsync({ from: uri, to: output });
   return output;
 }
 export async function imageData(uri: string): Promise<string> {

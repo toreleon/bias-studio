@@ -74,6 +74,13 @@ export async function pickMany(
   return items;
 }
 export async function persistImage(uri: string) {
+  try {
+    await loadImage(uri);
+  } catch {
+    throw new Error(
+      "A shared image could not be read. Your existing workspace is unchanged.",
+    );
+  }
   return uri;
 }
 export async function imageData(uri: string) {
@@ -138,6 +145,8 @@ export async function renderSticker(
   design: StickerDesign,
   _view?: any,
 ): Promise<Sticker> {
+  if (design.source && !design.sample) await loadImage(design.source);
+  if (design.originalSource) await loadImage(design.originalSource);
   const svg = scene(design);
   const blob = new Blob([svg], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);

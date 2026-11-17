@@ -1,7 +1,7 @@
 import { test, expect, Page } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { unzipSync } from "fflate";
+import { unzipSync, zipSync, strToU8, strFromU8 } from "fflate";
 import { scene } from "../../src/scene";
 import { defaultDesign } from "../../src/domain";
 const fixtures = path.join(process.cwd(), "tests/fixtures");
@@ -251,6 +251,30 @@ test("pack sharing exports real 512px WebP files and reimports editable credit-b
     page.getByText("Comfort club", { exact: true }).last(),
   ).toBeVisible();
   const w = await state(page);
+  // A corrupt embedded image must fail before a collection is committed.
+  await page.goto("/packs");
+  const malformed = JSON.parse(strFromU8(zip["collection.json"]));
+  malformed.collection.items[0].design.source =
+    "data:image/png;base64,aW52YWxpZA==";
+  malformed.collection.items[0].design.sample = undefined;
+  const badChooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Import pack file" }).click();
+  await (
+    await badChooser
+  ).setFiles({
+    name: "broken.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.from(
+      zipSync({ "collection.json": strToU8(JSON.stringify(malformed)) }),
+    ),
+  });
+  await expect(
+    page.getByText(
+      "A shared image could not be read. Your existing workspace is unchanged.",
+    ),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Got it" }).click();
+  expect(await state(page)).toEqual(w);
   expect(w.collections).toHaveLength(2);
   expect(w.collections[0].publisher).toBe("@nova");
   expect(w.collections[0].origin.creator).toBe("@nova");
