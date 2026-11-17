@@ -1,0 +1,46 @@
+services:
+  beta:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file: ../server/.env.local
+    environment:
+      BETA_HOST: 0.0.0.0
+      BETA_PORT: 8788
+      BETA_DB: /data/beta.sqlite
+      BETA_PUBLIC_URL: https://${PUBLIC_HOST:?Set PUBLIC_HOST in deploy environment}
+      BETA_WEB_ORIGIN: ${WEB_ORIGIN:-https://${PUBLIC_HOST}}
+    volumes:
+      - beta_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+  https:
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set PUBLIC_HOST in deploy environment}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      beta:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+volumes:
+  beta_data:
+  caddy_data:
+  caddy_config:

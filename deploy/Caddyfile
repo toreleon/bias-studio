@@ -1,0 +1,8 @@
+{$PUBLIC_HOST} {
+  # Access logging intentionally disabled: invite/request contents never belong in logs.
+  request_body {
+    max_size 8MB
+  }
+  header Strict-Transport-Security "max-age=31536000"
+  reverse_proxy beta:8788
+}

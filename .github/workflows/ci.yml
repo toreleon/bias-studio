@@ -37,6 +37,8 @@ jobs:
         run: bash scripts/check-workflows.sh
       - run: npm run check
       - run: npm run test:release
+      - name: Build and smoke-test private beta service
+        run: bash scripts/check-beta-container.sh
 
   web:
     name: Browser and web build

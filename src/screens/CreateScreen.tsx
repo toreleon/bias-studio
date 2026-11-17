@@ -27,10 +27,14 @@ import {
   Feeling,
   feelings,
   generationPrompt,
+  generationTargets,
+  recoverableAttempts,
+  GenerationAttempt,
   looks,
   reuseRecipe,
 } from "../creation/model";
-import { generateImage, generationURL } from "../creation/client";
+import { assertAttemptOwner, cancelGeneration, GenerationJob, generationUsage, GenerationUsage, markAttemptKept, pollDelay, readGeneration, recoverGeneration } from "../creation/client";
+import { betaConnected, betaCreatorId, betaURL as generationURL, connectBeta, disconnectBeta } from "../beta/client";
 
 export function CreateScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,15 +47,23 @@ export function CreateScreen() {
   const [connect, setConnect] = useState<Feeling[] | null>(null);
   const [token, setToken] = useState("");
   const [connectReady, setConnectReady] = useState(false);
+  const [accountConnected, setAccountConnected] = useState(betaConnected());
   const [inspectReady, setInspectReady] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
   const [inspect, setInspect] = useState<string | null>(null);
   const active = useRef<AbortController | null>(null);
+  const currentJob = useRef<string | null>(null);
+  const [recover, setRecover] = useState(false);
+  const [usage, setUsage] = useState<GenerationUsage | null>(null);
+  const stopReason = useRef("");
   const mounted = useRef(true);
   useEffect(
-    () => () => {
-      mounted.current = false;
-      active.current?.abort();
+    () => {
+      mounted.current = true;
+      return () => {
+        mounted.current = false;
+        active.current?.abort();
+      };
     },
     [],
   );
@@ -61,7 +73,12 @@ export function CreateScreen() {
     store.change((old) => ({
       ...old,
       creations: (old.creations || []).map((d) =>
-        d.id === id ? { ...fn(d), updatedAt: Date.now() } : d,
+        d.id === id ? (() => {
+          const next = fn(d);
+          if (next.prompt !== d.prompt || next.look !== d.look || next.reference !== d.reference)
+            next.approvedSampleId = undefined;
+          return { ...next, updatedAt: Date.now() };
+        })() : d,
       ),
     }));
   }
@@ -79,77 +96,147 @@ export function CreateScreen() {
   const look = looks.find((l) => l.id === draft.look)!;
   const valid = !!draft.prompt.trim() && draft.feelings.length > 0;
   const full = draft.candidates.length >= 24;
+  const pending = recoverableAttempts(draft);
+  const sample = draft.candidates.find((c) => c.id === draft.approvedSampleId);
   function requestGeneration(targets: Feeling[]) {
     if (busy || !valid || !generationURL || !targets.length || full) return;
+    if (pending.length) {
+      setError("Recover your existing request before starting another. Recovery does not create another paid request.");
+      setStep(2);
+      return;
+    }
+    setRecover(false);
     setConnectReady(false);
-    setConnect(targets.slice(0, 24 - draft!.candidates.length));
+    setConnect(generationTargets(draft!, targets));
+  }
+  function requestRecovery() {
+    setRecover(true);
+    setConnectReady(false);
+    setConnect([]);
+  }
+  function saveJob(attempt: GenerationAttempt, job: GenerationJob) {
+    update((d) => ({ ...d, attempts: (d.attempts || []).map((a) => a.requestId === attempt.requestId
+      ? { ...a, ownerId: a.ownerId || betaCreatorId(), jobId: job.id, status: job.status, error: job.error?.message?.slice(0, 1000), resultExpired: job.resultExpired } : a) }));
+  }
+  async function saveResult(attempt: GenerationAttempt, job: GenerationJob) {
+    if (!job.result) return;
+    const uri = await prepareGeneratedImage(job.result.image);
+    if (!mounted.current) return;
+    const candidate: Candidate = {
+      id: newId(), attemptId: attempt.requestId, uri, feeling: attempt.feeling, selected: true,
+      caption: attempt.caption,
+      provenance: { kind: "generated", prompt: attempt.subject, look: attempt.look,
+        feeling: attempt.feeling, model: job.result.model },
+    };
+    update((d) => d.candidates.some((c) => c.attemptId === attempt.requestId) ? d :
+      { ...d, candidates: [...d.candidates, candidate] });
+    await store.flush();
+  }
+  async function runAttempt(attempt: GenerationAttempt, controller: AbortController) {
+    // POST is idempotent: even a lost response reuses the persisted request body and ID.
+    let job = await recoverGeneration(attempt, controller.signal);
+    currentJob.current = job.id;
+    saveJob(attempt, job);
+    await store.flush();
+    while (job.status === "queued" || job.status === "running") {
+      setBusy(`${feelings.find((f) => f.id === attempt.feeling)!.label} · ${job.status}`);
+      await pollDelay(controller.signal);
+      job = await readGeneration(job.id, controller.signal);
+      if (job.requestId !== attempt.requestId) throw new Error("The service returned a different request.");
+      saveJob(attempt, job);
+      await store.flush();
+    }
+    if (job.status !== "succeeded") {
+      throw new Error(`${job.error?.message || `Generation ${job.status}.`} No new request starts automatically. Review the result before choosing a new variation.`);
+    }
+    if (job.resultExpired) throw new Error("This generated image has expired on the server. Any saved local copy is safe. A new variation is a separate paid request.");
+    await saveResult(attempt, job);
   }
   async function generate(targets: Feeling[]) {
     if (active.current) return;
     const snapshot = latest.current!;
     const controller = new AbortController();
     active.current = controller;
-    setConnect(null);
+    stopReason.current = "";
     setError("");
+    setBusy(recover ? "Recovering saved request…" : "Connecting studio…");
     setStep(2);
-    let savedCount = 0;
     try {
+      if (!betaConnected()) await connectBeta(token.trim());
+      setAccountConnected(true);
+      setToken("");
+      setConnect(null);
+      try { setUsage(await generationUsage()); } catch { /* Server quota remains authoritative. */ }
       await store.flush();
-      const reference = snapshot.reference
-        ? await imageData(snapshot.reference)
-        : undefined;
-      for (const feeling of targets) {
-        if (controller.signal.aborted) break;
-        setBusy(
-          `Making ${feelings.find((f) => f.id === feeling)!.label.toLowerCase()} · ${savedCount + 1} of ${targets.length}`,
-        );
-        // No automatic retries: each request may incur a provider charge.
-        const timeout = setTimeout(() => controller.abort(), 165000);
-        let result;
-        try {
-          result = await generateImage(
-            generationURL,
-            token,
-            { prompt: generationPrompt(snapshot, feeling), reference },
-            controller.signal,
-          );
-        } finally {
-          clearTimeout(timeout);
+      if (recover) {
+        for (const attempt of recoverableAttempts(snapshot)) {
+          if (controller.signal.aborted) break;
+          await runAttempt(attempt, controller);
         }
-        const uri = await prepareGeneratedImage(result.image);
-        if (!mounted.current || controller.signal.aborted) break;
-        const candidate: Candidate = {
-          id: newId(),
-          uri,
-          feeling,
-          selected: true,
-          caption: snapshot.captions
-            ? feelings.find((f) => f.id === feeling)!.caption
-            : "",
-          provenance: {
-            kind: "generated",
-            prompt: snapshot.prompt,
-            look: snapshot.look,
-            feeling,
-            model: result.model,
-          },
-        };
-        update((d) => ({ ...d, candidates: [...d.candidates, candidate] }));
-        await store.flush();
-        savedCount++;
+      } else {
+        const approved = snapshot.candidates.find((c) => c.id === snapshot.approvedSampleId);
+        const referenceURI = snapshot.useSampleReference && approved ? approved.uri : snapshot.reference;
+        const reference = referenceURI ? await imageData(referenceURI) : undefined;
+        if (reference && reference.length > 8 * 1024 * 1024)
+          throw new Error("This reference is too large. Choose a smaller image before generating.");
+        for (const feeling of generationTargets(snapshot, targets)) {
+          if (controller.signal.aborted) break;
+          if ((store.snapshot().creations?.find((c) => c.id === id)?.attempts?.length || 0) >= 120)
+            throw new Error("This draft has reached its request limit. Reuse its recipe in a new creation.");
+          const attempt: GenerationAttempt = {
+            requestId: newId(), ownerId: betaCreatorId(), feeling, prompt: generationPrompt({ ...snapshot, reference }, feeling), reference,
+            subject: snapshot.prompt, look: snapshot.look, status: "queued",
+            caption: snapshot.captions ? feelings.find((f) => f.id === feeling)!.caption : "",
+          };
+          update((d) => ({ ...d, attempts: [...(d.attempts || []), attempt] }));
+          // Never contact the provider until the exact recoverable request is saved locally.
+          await store.flush();
+          await runAttempt(attempt, controller);
+        }
       }
+      await syncKept();
+      try { setUsage(await generationUsage()); } catch { /* Completed work remains available. */ }
     } catch (e) {
-      if (mounted.current)
-        setError(
-          controller.signal.aborted
-            ? "Generation stopped. Finished results are kept. An in-flight request may still be charged; nothing retries automatically."
-            : e instanceof Error && !(e instanceof TypeError)
-              ? e.message
-              : "Connection interrupted. Your finished results are safe; try again.",
-        );
+      if (mounted.current) {
+        setConnect(null);
+        setError(controller.signal.aborted
+          ? stopReason.current || "Monitoring paused. The server may still finish this request. Recover it to retrieve the result without starting another generation."
+          : e instanceof Error && !(e instanceof TypeError) ? e.message
+            : "Connection interrupted. Recover the saved request; do not start a new variation yet.");
+      }
     } finally {
       active.current = null;
+      currentJob.current = null;
       if (mounted.current) setBusy("");
+    }
+  }
+  async function syncKept() {
+    const creation = store.snapshot().creations?.find((c) => c.id === id);
+    for (const attempt of creation?.attempts || []) {
+      if (attempt.kept && !attempt.keptReported && attempt.jobId) {
+        await markAttemptKept(attempt);
+        update((d) => ({ ...d, attempts: d.attempts?.map((a) => a.requestId === attempt.requestId ? { ...a, keptReported: true } : a) }));
+        await store.flush();
+      }
+    }
+  }
+  async function cancelQueued() {
+    if (!currentJob.current) return;
+    try {
+      const currentAttempt = store.snapshot().creations?.find((c) => c.id === id)?.attempts?.find((a) => a.jobId === currentJob.current);
+      if (!currentAttempt) throw new Error("Recover the job before cancelling it.");
+      assertAttemptOwner(currentAttempt);
+      const job = await cancelGeneration(currentJob.current);
+      if (job.status === "cancelled") {
+        const attempt = store.snapshot().creations?.find((c) => c.id === id)?.attempts?.find((a) => a.jobId === job.id);
+        if (attempt) saveJob(attempt, job);
+        await store.flush();
+        stopReason.current = "Cancellation confirmed. A request already sent to the provider may still use your allowance. Finished local images are safe.";
+        active.current?.abort();
+      }
+      else setError("This request is already running and cannot be safely cancelled. You can pause monitoring and recover it later.");
+    } catch {
+      setError("Cancellation was not confirmed. Recover the request to check its status; it may still finish.");
     }
   }
   async function importResults() {
@@ -217,11 +304,15 @@ export function CreateScreen() {
           ...pack.items.map((i) => JSON.parse(JSON.stringify(i))),
         ],
         creations: old.creations?.map((d) =>
-          d.id === id ? { ...d, saved: true } : d,
+          d.id === id ? { ...d, saved: true, attempts: d.attempts?.map((a) => ({ ...a,
+            kept: a.kept || d.candidates.some((c) => c.selected && c.attemptId === a.requestId) })) } : d,
         ),
       }));
-      router.push(`/pack/${pack.id}`);
       await store.flush();
+      if (betaConnected()) {
+        try { await syncKept(); } catch { store.notice("Your pack is saved. Usage reporting will retry when you recover this creation."); }
+      }
+      router.push(`/pack/${pack.id}`);
     });
   }
   const viewed = draft.candidates.find((c) => c.id === inspect);
@@ -234,7 +325,7 @@ export function CreateScreen() {
         busy ? (
           <Action
             secondary
-            label="Stop generation"
+            label="Pause monitoring"
             onPress={() => active.current?.abort()}
           />
         ) : step === 0 ? (
@@ -247,7 +338,7 @@ export function CreateScreen() {
         ) : step === 1 ? (
           generationURL ? (
             <Action
-              label={`Generate ${draft.feelings.length} reactions`}
+              label={sample ? `Generate ${draft.feelings.length} reactions` : "Generate one sample"}
               icon={Sparkles}
               disabled={!valid || full}
               onPress={() => requestGeneration(draft.feelings)}
@@ -306,8 +397,7 @@ export function CreateScreen() {
           <View style={{ gap: 8 }}>
             <T style={v.title}>What’s your{"\n"}next obsession?</T>
             <T style={v.sub}>
-              Start with a character, a photo, or an inside joke. We’ll build
-              the reactions around it.
+              AI stylization is optional. Start with a character, a photo or an inside joke; review one sample before making more.
             </T>
           </View>
           <View
@@ -499,8 +589,7 @@ export function CreateScreen() {
               {draft.feelings.length} reactions · {look.name}
             </T>
             <T style={{ color: "#DED3EF", lineHeight: 22 }}>
-              Each reaction is a separate image. Keep your favorites and try
-              another version of just the ones you want.
+              Generate one sample first. Approve its look before making the remaining reactions. Captions are added separately and stay editable.
             </T>
           </View>
           {!generationURL && (
@@ -550,6 +639,7 @@ export function CreateScreen() {
               details. Captions stay editable in your pack.
             </T>
           </View>
+          {usage && <T style={v.small}>{usage.remainingToday} of {usage.quota} beta requests available today · {usage.kept} results kept in packs</T>}
           {!!busy && (
             <View
               accessibilityLiveRegion="polite"
@@ -560,9 +650,9 @@ export function CreateScreen() {
                 <T style={{ fontFamily: "DMSans_700Bold", flex: 1 }}>{busy}</T>
               </View>
               <T style={v.small}>
-                Finished images save one at a time. Keep this screen open; you
-                can stop without losing completed results.
+                Results and request IDs save one at a time. Leaving this screen pauses monitoring; recover the same request when you return.
               </T>
+              <Action secondary label="Request cancellation" onPress={cancelQueued} />
             </View>
           )}
           {!!error && (
@@ -571,6 +661,21 @@ export function CreateScreen() {
               style={[v.card, { backgroundColor: "#FFF0DF" }]}
             >
               <T style={v.sub}>{error}</T>
+            </View>
+          )}
+          {!busy && (pending.length > 0 || draft.attempts?.some((a) => a.kept && !a.keptReported)) && (
+            <View style={v.card}>
+              <T style={v.section}>Recover your saved work</T>
+              <T style={v.sub}>Check the existing request and retrieve its result. This reuses its request ID and does not purchase another image.</T>
+              <Action label="Recover saved requests" onPress={requestRecovery} />
+            </View>
+          )}
+          {!busy && draft.candidates.length > 0 && (
+            <View style={v.card}>
+              <T style={v.section}>{sample ? "Sample approved" : "Approve a sample before making more"}</T>
+              <T style={v.sub}>Inspect a result and choose “Approve as sample”. Check likeness, hands and expression. AI styling may change real details.</T>
+              {sample && <Chip label="Use approved sample as consistency reference" selected={!!draft.useSampleReference}
+                onPress={() => update((d) => ({ ...d, useSampleReference: !d.useSampleReference }))} />}
             </View>
           )}
           {!draft.candidates.length && !busy && (
@@ -662,9 +767,9 @@ export function CreateScreen() {
                 <Action
                   secondary
                   label={
-                    missing.length
-                      ? `Generate ${missing.length} missing reactions`
-                      : "Make another variation"
+                    !sample ? "Generate one new sample" : missing.length
+                      ? `Generate ${missing.length} remaining reactions`
+                      : "Make a new variation"
                   }
                   icon={RefreshCw}
                   disabled={!valid || full}
@@ -737,16 +842,15 @@ export function CreateScreen() {
             <View style={[v.card, { padding: 24 }]}>
               <Sparkles color={K.purple} size={30} />
               <T style={v.section}>
-                Ready to make {connect?.length} reactions?
+                {recover ? "Recover your saved requests?" : `Ready to make ${connect?.length} reaction${connect?.length === 1 ? "" : "s"}?`}
               </T>
               <T style={v.sub}>
                 Your description{draft.reference ? " and reference photo" : ""}{" "}
                 will be sent through the studio service to OpenAI. Generation
-                uses the studio’s API allowance; each retry is a new request.
+                uses your beta allowance. New variations use another request; recovery checks the existing request without generating again.
               </T>
-              <T style={v.small}>
-                Studio access code · kept only for this screen session
-              </T>
+              {(!accountConnected || !betaConnected()) && <>
+              <T style={v.small}>Beta invite code · session stays in memory only</T>
               <TextInput
                 accessibilityLabel="Studio access code"
                 editable={connectReady}
@@ -760,13 +864,16 @@ export function CreateScreen() {
                 placeholderTextColor={K.muted}
               />
               <T style={v.small}>
-                Use the access code from your studio operator, not an OpenAI API
-                key.
+                Use your beta invite code, not an OpenAI API key.
               </T>
+              </>}
+              {betaConnected() && <Action secondary label="Use a different creator invite" onPress={() => {
+                disconnectBeta(); setAccountConnected(false); setToken("");
+              }} />}
               <Action
-                label={`Send & generate ${connect?.length || 0}`}
+                label={recover ? "Connect & recover" : `Send & generate ${connect?.length || 0}`}
                 disabled={
-                  !connectReady || !token.trim() || token.startsWith("sk-")
+                  !connectReady || !!busy || (!betaConnected() && (!token.trim() || token.startsWith("sk-")))
                 }
                 onPress={() => connect && generate(connect)}
               />
@@ -829,6 +936,14 @@ export function CreateScreen() {
                     }))
                   }
                   style={v.input}
+                />
+                <Action
+                  label={draft.approvedSampleId === viewed.id ? "Approved sample ✓" : "Approve as sample"}
+                  disabled={!!busy}
+                  onPress={() => {
+                    update((d) => ({ ...d, approvedSampleId: viewed.id }));
+                    setInspect(null);
+                  }}
                 />
                 {generationURL && (
                   <Action

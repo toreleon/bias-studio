@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Modal, ScrollView, View } from "react-native";
+import { Modal, Pressable, ScrollView, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   BookmarkPlus,
@@ -486,10 +486,12 @@ export function PackScreen() {
             )}
             <View style={v.wrap}>
               {candidateFrames.map((f) => (
-                <Chip
+                <Pressable
                   key={f.seconds}
-                  label={`Frame ${f.seconds.toFixed(1)}s`}
-                  selected={frames.some((x) => x.seconds === f.seconds)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Frame ${f.seconds.toFixed(1)}s`}
+                  style={{padding: 6, borderRadius: 16, borderWidth: 2, borderColor: frames.some((x) => x.seconds === f.seconds) ? K.purple : K.line, alignItems: "center"}}
+                  accessibilityState={{selected: frames.some((x) => x.seconds === f.seconds)}}
                   onPress={() => {
                     setFrame(f);
                     setFrames((old) =>
@@ -498,7 +500,10 @@ export function PackScreen() {
                         : [...old, f],
                     );
                   }}
-                />
+                >
+                  <Art design={{...defaultDesign(f.uri), decoration: "none"}} size={84} />
+                  <T style={v.small}>{f.seconds.toFixed(1)}s {frames.some((x) => x.seconds === f.seconds) ? "✓" : "+"}</T>
+                </Pressable>
               ))}
             </View>
             <Action

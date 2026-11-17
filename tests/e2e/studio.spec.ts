@@ -6,6 +6,11 @@ import { scene } from "../../src/scene";
 import { defaultDesign } from "../../src/domain";
 const fixtures = path.join(process.cwd(), "tests/fixtures");
 const key = "bias-studio.workspace.v2";
+test.beforeEach(async ({ page }) => {
+  await page.route("http://localhost:8787/v1/config", (route) =>
+    route.fulfill({ json: { publicPages: false, telegram: false } }),
+  );
+});
 async function home(page: Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
@@ -48,9 +53,9 @@ async function demo(page: Page) {
     page.getByText("3 / 30 REACTIONS · PRIVATE DRAFT"),
   ).toBeVisible();
 }
-async function download(page: Page) {
+async function downloadEditable(page: Page) {
   await page
-    .getByRole("button", { name: "Download pack file", exact: true })
+    .getByRole("button", { name: "Share editable source files…", exact: true })
     .click();
   const event = page.waitForEvent("download");
   await page.getByRole("button", { name: "Create editable pack file" }).click();
@@ -214,7 +219,7 @@ test("pack sharing exports real 512px WebP files and reimports editable credit-b
   await expect(
     page.getByRole("button", { name: "Add to WhatsApp" }),
   ).toHaveCount(0);
-  const bytes = await download(page);
+  const bytes = await downloadEditable(page);
   const zip = unzipSync(bytes);
   expect(Object.keys(zip).filter((k) => k.endsWith(".webp"))).toHaveLength(3);
   const webp = Buffer.from(zip["stickers/01.webp"]);
@@ -371,7 +376,6 @@ test("export failure preserves drafts and a retry produces a pack file", async (
     };
   });
   await page.getByRole("button", { name: "Download pack file" }).click();
-  await page.getByRole("button", { name: "Create editable pack file" }).click();
   await expect(
     page.getByText("Image export failed. Please try again."),
   ).toBeVisible();
@@ -381,7 +385,7 @@ test("export failure preserves drafts and a retry produces a pack file", async (
     HTMLCanvasElement.prototype.toDataURL = (window as any).originalCanvas;
   });
   const event = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Create editable pack file" }).click();
+  await page.getByRole("button", { name: "Download pack file" }).click();
   await event;
   await page.getByRole("button", { name: "Got it" }).click();
 });

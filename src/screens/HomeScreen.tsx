@@ -92,7 +92,7 @@ export function HomeScreen() {
         }}
       >
         <T style={[v.title, { color: "white", fontSize: 35, lineHeight: 39 }]}>
-          Your ideas.{"\n"}A whole reaction pack.
+          Your favorite moments.{"\n"}Every big feeling.
         </T>
         <T
           style={{
@@ -102,8 +102,8 @@ export function HomeScreen() {
             maxWidth: 310,
           }}
         >
-          Dream up a character. Bring a favorite face. Make a little collection
-          of every big feeling.
+          Turn a comeback, concert or favorite clip into a reaction pack.
+          Keep your best reactions ready for the next group chat.
         </T>
         <View
           style={{
@@ -132,16 +132,16 @@ export function HomeScreen() {
             </View>
           ))}
         </View>
-        <Action label="Create with AI" icon={Sparkles} onPress={create} />
+        <Action label="Start a reaction pack" icon={Plus} onPress={() => start()} />
         <T style={{ textAlign: "center", fontSize: 11, color: "#DBD0EC" }}>
-          Idea → look → favorites → your chat
+          Moments → style → preview → share
         </T>
       </View>
       <Action
         secondary
-        label="Start a reaction pack"
-        icon={Plus}
-        onPress={() => start()}
+        label="Create with AI"
+        icon={Sparkles}
+        onPress={create}
       />
       <View style={v.row}>
         <View style={{ flex: 1 }}>
@@ -161,6 +161,7 @@ export function HomeScreen() {
           />
         </View>
       </View>
+      <T style={v.small}>Photos keep the original expression. AI is an optional stylized reinterpretation; your sources stay private unless you choose to share them.</T>
       {!!store.data.creations?.length && (
         <View style={{ gap: 12 }}>
           <T style={v.section}>Your ideas, still blooming</T>

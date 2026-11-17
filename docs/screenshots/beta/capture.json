@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-11-17T09:48:54.779Z",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "device": "Chromium mobile viewport; not a physical device",
+  "backend": "Actual loopback HTTP with ephemeral SQLite; no mocked routes",
+  "generation": "Disabled; no provider call",
+  "telegram": "Disabled; no bot call",
+  "verified": [
+    "UI rendered and uploaded finished stickers",
+    "anonymous recipient imported actual server ZIP",
+    "private source/provenance absent",
+    "unpublish returned404"
+  ]
+}
