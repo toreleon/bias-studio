@@ -4,52 +4,87 @@ export interface Media {
   uri: string;
   kind: "photo" | "video";
   duration: number;
+  name?: string;
 }
 export async function pickMedia(kind: Media["kind"]): Promise<Media | null> {
-  const file = await new Promise<File | null>((resolve) => {
+  return (await pickMany(kind, 1))[0] || null;
+}
+export async function pickMany(
+  kind: Media["kind"],
+  limit = 30,
+): Promise<Media[]> {
+  const files = await new Promise<File[]>((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
+    input.multiple = kind === "photo";
     input.accept = kind === "video" ? "video/*" : "image/*";
-    input.onchange = () => resolve(input.files?.[0] || null);
-    input.oncancel = () => resolve(null);
+    input.onchange = () => resolve(Array.from(input.files || []));
+    input.oncancel = () => resolve([]);
     input.click();
   });
-  if (!file) return null;
-  if (file.size > 150 * 1024 * 1024)
-    throw new Error("Choose a file smaller than 150 MB.");
-  if (kind === "video") {
-    const uri = URL.createObjectURL(file);
-    const duration = await new Promise<number>((resolve, reject) => {
-      const video = document.createElement("video");
-      video.preload = "metadata";
-      video.onloadedmetadata = () => {
-        resolve(Number.isFinite(video.duration) ? video.duration : 0);
-        video.removeAttribute("src");
-        video.load();
-      };
-      video.onerror = () => {
-        URL.revokeObjectURL(uri);
-        reject(
-          new Error("Your browser cannot read this video. Try an MP4 file."),
-        );
-      };
-      video.src = uri;
-    });
-    return { uri, kind, duration };
+  if (files.length > limit)
+    throw new Error(`Choose up to ${limit} photos for this pack.`);
+  const items: Media[] = [];
+  for (const file of files) {
+    if (file.size > 150 * 1024 * 1024)
+      throw new Error("Choose a file smaller than 150 MB.");
+    if (kind === "video") {
+      const uri = URL.createObjectURL(file);
+      const duration = await new Promise<number>((resolve, reject) => {
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.onloadedmetadata = () => {
+          resolve(Number.isFinite(video.duration) ? video.duration : 0);
+          video.removeAttribute("src");
+          video.load();
+        };
+        video.onerror = () => {
+          URL.revokeObjectURL(uri);
+          reject(
+            new Error("Your browser cannot read this video. Try an MP4 file."),
+          );
+        };
+        video.src = uri;
+      });
+      items.push({ uri, kind, duration, name: file.name });
+    } else {
+      const uri = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () =>
+          reject(new Error("This photo could not be read."));
+        reader.readAsDataURL(file);
+      });
+      const image = await loadImage(uri);
+      const canvas = document.createElement("canvas");
+      const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
+      canvas.width = image.width * scale;
+      canvas.height = image.height * scale;
+      canvas
+        .getContext("2d")!
+        .drawImage(image, 0, 0, canvas.width, canvas.height);
+      items.push({
+        uri: canvas.toDataURL("image/png"),
+        kind,
+        duration: 0,
+        name: file.name,
+      });
+    }
   }
-  const uri = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("This photo could not be read."));
-    reader.readAsDataURL(file);
-  });
-  const image = await loadImage(uri);
-  const canvas = document.createElement("canvas");
-  const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
-  canvas.width = image.width * scale;
-  canvas.height = image.height * scale;
-  canvas.getContext("2d")!.drawImage(image, 0, 0, canvas.width, canvas.height);
-  return { uri: canvas.toDataURL("image/png"), kind, duration: 0 };
+  return items;
+}
+export async function persistImage(uri: string) {
+  try {
+    await loadImage(uri);
+  } catch {
+    throw new Error(
+      "A shared image could not be read. Your existing workspace is unchanged.",
+    );
+  }
+  return uri;
+}
+export async function imageData(uri: string) {
+  return uri;
 }
 export async function videoFrame(
   uri: string,
@@ -110,6 +145,8 @@ export async function renderSticker(
   design: StickerDesign,
   _view?: any,
 ): Promise<Sticker> {
+  if (design.source && !design.sample) await loadImage(design.source);
+  if (design.originalSource) await loadImage(design.originalSource);
   const svg = scene(design);
   const blob = new Blob([svg], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);
@@ -159,4 +196,24 @@ export async function shareSticker(sticker: Sticker) {
 }
 export async function discardSticker(_sticker: Sticker) {
   /* Data URLs are released with the unsaved draft. */
+}
+
+export async function prepareGeneratedImage(uri: string): Promise<string> {
+  const image = await loadImage(uri);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 512;
+  const scale = Math.min(512 / image.width, 512 / image.height);
+  canvas
+    .getContext("2d")!
+    .drawImage(
+      image,
+      (512 - image.width * scale) / 2,
+      (512 - image.height * scale) / 2,
+      image.width * scale,
+      image.height * scale,
+    );
+  const compact = canvas.toDataURL("image/webp", 0.92);
+  return compact.startsWith("data:image/webp")
+    ? compact
+    : canvas.toDataURL("image/png");
 }

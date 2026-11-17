@@ -33,12 +33,19 @@ export function character(mood: Mood = "love") {
   </g>`;
 }
 
-export function scene(design: StickerDesign, imageData?: string): string {
+export function scene(
+  design: StickerDesign,
+  imageData?: string,
+  identifier = "sticker",
+  platform = "web",
+): string {
   const { color, shape, zoom, x, y, decoration } = design;
   const caption = design.caption.trim().slice(0, 28);
-  const image = design.sample
-    ? character(design.sample)
-    : `<g${shape === "cutout" ? "" : ' clip-path="url(#crop)"'}><image href="${escape(imageData || design.source)}" x="${56 + x - (zoom - 1) * 200}" y="${44 + y - (zoom - 1) * 176}" width="${400 * zoom}" height="${352 * zoom}" preserveAspectRatio="xMidYMid ${shape === "cutout" ? "meet" : "slice"}"/></g>`;
+  const image = design.flattened
+    ? `<image href="${escape(imageData || design.source)}" width="512" height="512"/>`
+    : design.sample
+      ? character(design.sample)
+      : `<g${shape === "cutout" ? "" : ' clip-path="url(#crop)"'}><image href="${escape(imageData || design.source)}" x="${56 + x - (zoom - 1) * 200}" y="${44 + y - (zoom - 1) * 176}" width="${400 * zoom}" height="${352 * zoom}" preserveAspectRatio="xMidYMid ${shape === "cutout" ? "meet" : "slice"}"/></g>`;
   const backing =
     shape === "cutout"
       ? ""
@@ -55,5 +62,49 @@ export function scene(design: StickerDesign, imageData?: string): string {
       : decoration === "hearts"
         ? `<path d="M420 150c-69-45-46-81-15-62l15 15 15-15c31-19 54 17-15 62M88 333c-43-28-29-50-9-38l9 9 9-9c20-12 34 10-9 38" fill="${color}" stroke="white" stroke-width="6"/>`
         : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512"><defs><clipPath id="crop">${clipping}</clipPath></defs>${backing}${image}${ornaments}${caption ? `<text x="256" y="449" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="${caption.length > 19 ? 30 : caption.length > 12 ? 38 : 48}" stroke="white" stroke-width="14" stroke-linejoin="round" paint-order="stroke fill" fill="#44334F">${escape(caption)}</text><text x="256" y="449" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="${caption.length > 19 ? 30 : caption.length > 12 ? 38 : 48}" fill="#44334F">${escape(caption)}</text>` : ""}</svg>`;
+  const font =
+    design.font === "serif"
+      ? platform === "ios"
+        ? "Georgia"
+        : "serif"
+      : design.font === "mono"
+        ? platform === "ios"
+          ? "Courier"
+          : "monospace"
+        : platform === "ios"
+          ? "Arial"
+          : "sans-serif";
+  const captionY =
+    design.captionPosition === "top"
+      ? 74
+      : design.captionPosition === "middle"
+        ? 270
+        : 449;
+  const captionSize = caption.length > 19 ? 30 : caption.length > 12 ? 38 : 48;
+  const strokes = design.strokes || [];
+  const brush = () =>
+    strokes
+      .map(
+        (stroke) =>
+          `<path d="${stroke.points.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ")}${stroke.points.length === 1 ? ` l0.01 0` : ""}" fill="none" stroke="${stroke.mode === "restore" ? "white" : "black"}" stroke-width="${stroke.radius * 2}" stroke-linecap="round" stroke-linejoin="round"/>`,
+      )
+      .join("");
+  const restored =
+    design.originalSource && strokes.some((s) => s.mode === "restore")
+      ? design.flattened
+        ? `<g mask="url(#restore)"><image href="${escape(design.originalSource)}" width="512" height="512"/></g>`
+        : `<g mask="url(#restore)"><image href="${escape(design.originalSource)}" x="${56 + x - (zoom - 1) * 200}" y="${44 + y - (zoom - 1) * 176}" width="${400 * zoom}" height="${352 * zoom}" preserveAspectRatio="xMidYMid meet"/></g>`
+      : "";
+  const letters = caption
+    ? `<text x="256" y="${captionY}" text-anchor="middle" font-family="${font}" font-weight="900" font-size="${captionSize}" stroke="${design.outlineColor || "#FFFFFF"}" stroke-width="${design.outline ?? 14}" stroke-linejoin="round" fill="${design.captionColor || "#44334F"}">${escape(caption)}</text><text x="256" y="${captionY}" text-anchor="middle" font-family="${font}" font-weight="900" font-size="${captionSize}" fill="${design.captionColor || "#44334F"}">${escape(caption)}</text>`
+    : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512"><defs><clipPath id="crop">${clipping}</clipPath><mask id="erase"><rect width="512" height="512" fill="white"/>${brush()}</mask><mask id="restore"><rect width="512" height="512" fill="black"/>${brush()}</mask></defs><g mask="url(#erase)">${design.flattened ? "" : backing}${image}</g>${restored}${ornaments}${letters}</svg>`
+    .replace(
+      /id="(crop|erase|restore)"/g,
+      (_, id) => `id="${identifier}-${id}"`,
+    )
+    .replace(
+      /url\(#(crop|erase|restore)\)/g,
+      (_, id) => `url(#${identifier}-${id})`,
+    );
 }

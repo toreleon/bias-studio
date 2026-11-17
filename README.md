@@ -1,170 +1,141 @@
 # Bias Studio
 
-A React Native mobile app for fans to turn photos and selected video frames into personal WhatsApp sticker packs. Working name and original demo artwork are included; no idol photographs are bundled.
+**Turn your favorite moments into a reaction pack—and build a reusable library for your fandom.**
+
+A mobile-first creator workspace for iPhone and Android, built on Expo SDK 54 / React Native. The browser preview uses the same editor and workspace. Original illustrative demo characters are included; no celebrity photos are bundled.
 
 [![CI](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml)
 
-CI runs quality checks, browser tests, and Android/iOS native builds. The [release gate guide](docs/RELEASING.md) explains protected main, human approval, immutable CI artifacts, and draft test candidates. GitHub administration settings must be activated separately with `npm run github:protect`; the release workflow blocks until those protections exist.
+## Generative reaction studio (1.2)
 
-## Screenshots
+Create with AI → subject/reference → visual direction + reaction lineup → compare favorites → editable pack → chat preview/export. Recipes save automatically and can be reused through Home or Library → AI recipes. In-app generation requires the optional server connection; disconnected builds support briefs and importing results without pretending generation succeeded.
 
-Mobile browser previews using the original demo characters:
+- [Mobile competitor UX research and design decisions](docs/GENERATIVE-UX-RESEARCH.md)
+- [GPT Image service setup and phone deployment](docs/GENERATION-SETUP.md)
+- [Verification and remaining real-device checks](docs/VERIFICATION.md)
 
-| Workshop | Sticker editor | Sticker pack |
+The live browser pilot generated three reference-based reactions with `gpt-image-1.5`, reopened them, made a pack, saved the library assets, exported a ZIP and reused the recipe. Automated tests use fixture responses and make no paid provider calls.
+
+## What works
+
+- Start immediately, name later, and resume automatically saved, editable drafts.
+- Import multiple photos or select several **still frames** from a video. Preserve the frame timestamps and source name.
+- Style selected reactions together: fonts, caption placement, outline width/color, ink, frames, accent colors and decoration. Save a style for future packs.
+- Refine individual captions and crop; native person cutout; manual erase/restore brushes; undo; accessible earlier/later reordering.
+- Save editable reactions to a reusable library, with optional fandom, member/character, era/event and emotion tags. Search/filter, duplicate and reuse independent copies across packs.
+- Preview every sticker at 148 logical pixels against light/dark chat backgrounds.
+- Native WhatsApp handoff with 3–30 validated, transparent 512 × 512 WebP files, ≤100 KiB each, plus a 96 × 96 PNG tray icon ≤50 KiB. The app reports **handoff**, never unverified installation.
+- Export one portable ZIP containing editable designs, original/cutout images, captions, tags, timestamps, creator credit, collection identity and ready-rendered WebP stickers. Import it on another installation through **Packs → Import pack file**.
+- Preserve v1 packs and the original storage key during migration. Legacy stickers remain reusable as flattened images; their baked-in text cannot be independently edited.
+
+Automatic person cutout uses Apple Vision on iOS and bundled ML Kit person segmentation on Android. Manual correction works on both platforms and in the browser. There is no animated output, production account system, public page, cloud sync, marketplace or subscription. An optional controlled-pilot generation server is included. Drafts stay on the device; generation uploads only the description and reference after explicit confirmation. A shared ZIP deliberately contains the editable source assets; the app explains this before sharing.
+
+## Main screens
+
+Actual 390px mobile **browser** captures of the implemented app; these are not physical-device screenshots.
+
+The AI screenshots below use actual GPT Image results from the live test, not fixture output.
+
+| Idea and reference | Visual direction | Generated favorites |
 | --- | --- | --- |
-| <img src="docs/screenshots/01-home.png" width="220" alt="Bias Studio workshop home screen" /> | <img src="docs/screenshots/02-editor.png" width="220" alt="Sticker editor with caption and styling controls" /> | <img src="docs/screenshots/03-pack.png" width="220" alt="A three-sticker pack ready for WhatsApp export" /> |
+| <img src="docs/screenshots/ai/02-idea.png" width="220" alt="Saved subject and reference composer" /> | <img src="docs/screenshots/ai/03-look.png" width="220" alt="Visual styles and reaction choices" /> | <img src="docs/screenshots/ai/04-results.png" width="220" alt="Three actual GPT Image reactions with favorite selection" /> |
 
-## First version
+| Pack preview | Reusable recipes |
+| --- | --- |
+| <img src="docs/screenshots/ai/07-chat.png" width="220" alt="AI reactions in chat preview" /> | <img src="docs/screenshots/ai/08-recipes.png" width="220" alt="Saved AI recipes in the library" /> |
 
-- iPhone and Android interfaces built with React Native and Expo SDK 54.
-- Import photos through the system picker. Select a still frame from a video.
-- Zoom, reposition, choose soft square/circle/unframed styles, add short captions, colors, hearts, and sparkles.
-- Native person cutout with Apple Vision on iOS and bundled ML Kit selfie segmentation on Android. Images stay on the device.
-- Create packs, save/delete stickers, delete packs, and keep the local library across restarts.
-- Render transparent 512 × 512 WebP stickers, progressively compress to a maximum of 100 KB, and generate a 96 × 96 PNG tray icon under 50 KB.
-- Validate WhatsApp's 3–30 sticker limits before handoff. Android uses a protected content provider and enable-pack intent. iOS uses WhatsApp's local pasteboard protocol.
-- Download individual WebP stickers in the browser preview or use the native share sheet on a phone.
+| Home | Reaction library | Pack |
+| --- | --- | --- |
+| <img src="docs/screenshots/01-home.png" width="220" alt="Home with a start-pack action and recent work" /> | <img src="docs/screenshots/02-library.png" width="220" alt="Searchable reaction library" /> | <img src="docs/screenshots/03-pack.png" width="220" alt="Multi-sticker pack with selection and refinement" /> |
 
-Video support currently means **still stickers from video frames**, not animated stickers. There is no backend, account, public feed, or cloud sync. The app does not upload your photos. Android person cutout uses Google’s ML Kit SDK; review its SDK privacy terms when preparing store disclosures. System backups are governed by the OS; Android backup is disabled in app configuration.
+| Individual editor | Chat preview |
+| --- | --- |
+| <img src="docs/screenshots/04-editor.png" width="240" alt="Large sticker canvas and caption controls" /> | <img src="docs/screenshots/05-preview.png" width="240" alt="Sticker reactions at chat size" /> |
 
-## Run the browser preview
+## Run and test
 
-Requires Node.js 20.19+ and npm. Node.js 22 LTS is recommended.
+Use Node 22 and npm:
 
 ```sh
 npm ci
 npm run web
 ```
 
-Open the URL printed by Expo (port 8081). Try the original demo characters, or import your own PNG/JPEG or MP4. Browser libraries live in local storage and are subject to its quota. Private browsing and clearing site data can remove your packs.
+Open the Expo URL (port 8081). Try the three-reaction demo or import PNG/JPEG photos and an MP4 video. The preview supports real editing, saving, importing/exporting pack files and downloads. Native WhatsApp actions are not displayed in the browser. Browser storage quotas apply; clearing site data removes that browser's workspace. Use pack files as portable copies.
 
-The browser preview supports the real editor, video frame selection, pack persistence, and WebP downloads. Person cutout and WhatsApp pack installation require a native build. The app explains this when those actions are selected.
+```sh
+npm run check                 # zero-warning lint, TypeScript, domain/workspace tests
+npm run test:release          # fail-closed release-policy tests
+npx playwright install chromium
+CI=1 npm run test:e2e         # creator workflows, migration, failures, screenshots
+npm run export:web           # production browser bundle
+```
+
+If Chromium is already installed, use `CHROMIUM_PATH=/usr/bin/chromium CI=1 npm run test:e2e`. Production web hosting needs an SPA fallback to `index.html` for Expo Router deep links; `npx serve -s dist` is suitable for a local exported preview.
 
 ## Build for phones
 
-**Expo Go does not include the custom native module.** Use an Expo development build or a standalone build. The native module is included in `modules/fan-stickers` and autolinks during prebuild. Generated `android/` and `ios/` folders are disposable; source changes belong in the module or app configuration.
+**Expo Go does not contain the custom native module.** Use a development or standalone build. The Kotlin/Swift module lives in `modules/fan-stickers` and autolinks. Generated root `android/` and `ios/` directories are disposable; configure them through `app.json` or module sources.
 
-### Android, locally
-
-Install Android Studio, Android SDK platform 36, the corresponding build tools, and JDK 17. Configure `ANDROID_HOME` and connect a phone with USB debugging, or start an emulator.
+Android: install JDK 17, Android SDK 36/build tools, configure `ANDROID_HOME`, and connect a phone or start an emulator:
 
 ```sh
 npm ci
 npm run android
 ```
 
-Expo generates the native project and builds it. Android 7.0+ is the Expo baseline. Test WhatsApp handoff with WhatsApp installed on a real phone.
-
-### iPhone, locally
-
-Use macOS, Xcode, CocoaPods, an Apple signing team, and a connected iPhone. The Expo baseline is iOS 15.1+.
+iPhone: macOS, Xcode, CocoaPods, a signing team and connected device are required:
 
 ```sh
 npm ci
 npm run ios -- --device
 ```
 
-Use a physical iPhone with WhatsApp installed to test the pasteboard handoff. A simulator cannot validate the real WhatsApp flow. Person cutout uses Vision's person segmentation rather than general object segmentation.
-
-### Cloud builds with EAS
-
-Build profiles are in `eas.json`. Sign in to your own Expo account, link the project, and provide signing credentials when EAS requests them. No account or signing credentials are included in this project.
+EAS profiles are included. Supply your own Expo account and Apple provisioning for iPhone builds:
 
 ```sh
-npx eas-cli login
-npx eas-cli build:configure
-npx eas-cli build --platform android --profile development
-npx eas-cli build --platform ios --profile development
+npx eas-cli@latest login
+npx eas-cli@latest build:configure
+npx eas-cli@latest build --platform android --profile development
+npx eas-cli@latest build --platform ios --profile development
 npm start
 ```
 
-The Android development profile produces an APK. iOS device builds require Apple Developer membership and device provisioning. Replace `studio.bias.app` with your own bundle/package identifier before distribution.
+For unsigned simulator testing use `--platform ios --profile ios-simulator`. Simulator apps cannot be installed on iPhones or validate WhatsApp installation. Replace the working `studio.bias.app` identifiers and template signing configuration before production distribution.
 
-To check iOS native compilation before setting up device signing, use the simulator profile:
+## Acceptance walkthrough
 
-```sh
-npx eas-cli build --platform ios --profile ios-simulator
-```
+1. On Home, choose **Import photos**, select three images, and enter the pack immediately. No name is required.
+2. Use **Style selected** to choose a font/color/placement. Enter a style name and save it. Refine one reaction's caption or cutout; the others stay intact.
+3. Optionally organize reactions with fandom/member/era/emotion tags. **Save to library** snapshots the selected editable designs. Save again after later refinements to update those library copies.
+4. Name the collection and add creator credit. Wait for **Saved on this device**, close the app, then reopen the draft from Home.
+5. Open **Library**, search/filter, select reactions, then **New pack from … reactions**. Apply your saved style from the new pack's styling panel. These are independent copies; editing the second pack preserves the first.
+6. **Preview in chat**, then share/download a pack ZIP. On another installation, open **Packs → Import pack file**. It remains a private collection until shared again.
+7. In the native app, use **Add to WhatsApp** once the pack has 3–30 stickers. Confirm inside WhatsApp, then send the stickers there. A file share or return to Bias Studio is not proof of installation.
 
-This needs an Expo/EAS account but no Apple device provisioning. The resulting app runs in an iOS simulator on a Mac; it cannot be installed on an iPhone and cannot verify WhatsApp handoff. Use the device development profile for that final check.
+The test suite automates the two-pack acceptance scenario. Faster second-pack creation is a product hypothesis, not a measured user-study result. See [product direction and validation](docs/PRODUCT.md), [architecture and data](docs/ARCHITECTURE.md), and [verification/device checklist](docs/VERIFICATION.md).
 
-## Verify
+## CI and release safety
 
-```sh
-npm run lint
-npm run check
-npx playwright install chromium
-npm run test:e2e
-npm run export:web
-npx expo export --platform ios --platform android
-```
+The existing protected-main and human release-approval policies are retained. Every PR gates on quality, browser workflows, Android native build/release lint and iOS Release Simulator compilation. Actions remain SHA-pinned; PRs receive no production signing credentials. Release candidates require exact successful main CI artifacts, checksum verification and explicit physical-device signoff. See [RELEASING.md](docs/RELEASING.md).
 
-To use an existing Chromium installation in CI:
+Test artifacts are an ARM64 Android APK using the template debug key, an unsigned iOS Simulator app and a web-preview ZIP. They are not store releases. The workflow does not submit to stores, and no release is dispatched as part of this revamp.
 
-```sh
-CHROMIUM_PATH=/usr/bin/chromium CI=1 npm run test:e2e
-```
+## Known boundaries
 
-The six domain tests cover pack limits, invalid assets, immutable edits, stored-library validation, and XML escaping. Six browser scenarios verify creation/reload of three-sticker packs, actual photo and video imports, crop controls, mobile layout, quota errors, WebP signatures, pixel dimensions, and transparent corners.
+- Automatic cutout targets people. Brush corrections are in canvas coordinates; crop first, then refine edges. Undo history (20 workspace snapshots) lasts for the current session; designs and strokes persist across restarts.
+- Frames already added to a draft persist. The video-selection sheet is temporary: finish **Add frames to pack** before closing. Reimport a video to select additional frames later. Video decoding depends on OS/browser codec support.
+- Browser image data can exhaust local storage; unsaved changes stay in memory, the status shows **Not saved**, and retry is available. Do not close while that status is shown. Native sources and cutouts use app document storage, not expiring picker/cache paths.
+- Pack ZIPs are limited to 32 MiB compressed / 60 MiB metadata. They include original media images; video files themselves are not shared. No public URLs are generated.
+- Native source files and exported WhatsApp snapshots are retained to protect drafts, library references and installed-pack reads. Automatic orphan collection and stable in-place WhatsApp updates are follow-up work; changed packs may install as separate revisions.
+- Native compilation is not physical-device acceptance. Validate source persistence, capture/masking, share-sheet delivery, VoiceOver/TalkBack, and WhatsApp acceptance on actual Android and iPhone hardware before releasing.
+- Telegram, iMessage and Snapchat actions are absent. Destination adapters are separated from rendering for later integrations. Snapchat would require its supported sharing flow, not an assumed reusable-chat-pack installer.
 
-### Verification in the development environment
-
-- TypeScript and all six domain tests passed.
-- All six Playwright browser scenarios passed in Chromium, including a 390px mobile viewport.
-- Web, iOS, and Android JavaScript bundles exported successfully. This verifies bundling, not native compilation.
-- Expo prebuild succeeded for Android and iOS; autolinking found both native module implementations.
-- Android release APK packaging and native compilation succeeded against Android SDK 36. APK signature verification passed. The test APK targets arm64 phones, includes its JavaScript bundle, and uses the template debug signing key. It is a local test build; production distribution needs your own signing configuration.
-- The iOS Release Simulator app compiled successfully on GitHub Actions. Physical-device cutout quality and WhatsApp acceptance still need hands-on verification; this Linux workspace has no attached phone.
-- Expo Doctor passed all 18 checks after using the environment proxy and correcting the native module peer declaration. `expo install --check` found dependency versions compatible.
-
-## Device acceptance checklist
-
-1. Import a photo, remove the background, and inspect edges on light and dark chat backgrounds. Try one clear person, multiple people, and a photo without a person.
-2. Import a locally stored video, scrub to a later frame, caption it, and save it.
-3. Make packs of 2, 3, and 30 stickers. Export must be unavailable for 2 and available for 3–30.
-4. Export on Android and iPhone with WhatsApp installed. Confirm inside WhatsApp, send every sticker, and verify transparency, crop, legibility, and tray icon.
-5. Try with WhatsApp absent, cancel adding the pack in WhatsApp, and return to the app. The app only reports that WhatsApp opened; it never claims installation succeeded.
-6. Restart the app and phone, verify packs persist, and test permission denial and low storage without losing the existing library.
-7. Rebuild after native changes; a JavaScript refresh cannot load a changed native module.
-
-## Structure
-
-```text
-src/Studio.tsx             Navigation, library state, dialogs, save/export flows
-src/Home.tsx               Workshop and original demo artwork entry points
-src/Editor.tsx             Native sticker editor
-src/ui.tsx                 Shared components and visual styles
-src/domain.ts              Pack model and WhatsApp validation
-src/scene.ts               Shared transparent SVG sticker composition
-src/media.native.ts        Native import, thumbnail, capture, WebP, sharing
-src/media.web.ts           Browser import, video frame decoding, canvas, download
-src/storage.ts             Versioned local library; preserve unreadable data
-modules/fan-stickers/      Kotlin/Swift person cutout and WhatsApp bridges
-tests/                     Domain tests and browser scenarios
-```
-
-Native source images are not persisted in the library after rendering. Rendered stickers live in app document storage; temporary cutouts and thumbnails live in the app cache. Android exports keep immutable private snapshots so WhatsApp can read a consistent revision through the restricted provider. The provider serves only validated sticker/tray filenames, never original imported media. The iOS pasteboard handoff is local-only and expires after 60 seconds.
-
-## Next development steps
-
-The immediate next steps are the physical-device acceptance checklist above and activation of the repository protections documented in docs/RELEASING.md. Before a public release, choose final branding and identifiers, test across phone sizes and OS versions, replace demo app icons if desired, and prepare store privacy details and screenshots.
-
-Known first-version limits:
-
-- Cutout targets people; it is not a general object eraser and has no manual edge repair.
-- Long or unusually encoded video files depend on device codec support.
-- Local packs are not portable across phones; there is no full-pack backup/import flow yet.
-- Android WhatsApp exports use immutable revision identifiers. Exporting a changed pack can create a separate WhatsApp pack. Stable in-place pack updates and snapshot cleanup are follow-up work.
-- Deleting a pack removes it from the app shelf; existing exported snapshots and WhatsApp's copy are retained. Uninstalling the app removes its private files.
-- Accessibility and small-screen flows have browser coverage; VoiceOver/TalkBack and actual native screenshots still need device checks.
-
-Animated WebP stickers, manual mask repair, and optional backup are sensible next features. Community sharing would add a separate backend, rights/reporting, moderation, and storage scope.
+The app does not upload source photos. Review ML Kit SDK privacy terms and OS backup behavior for store disclosures (Android backup is disabled). Use media you have permission to use. Bias Studio is not affiliated with artists or messaging platforms.
 
 ## Protocol references
 
-- [Official WhatsApp sticker requirements and Android example](https://github.com/WhatsApp/stickers/tree/main/Android)
-- [Official WhatsApp iOS pasteboard protocol](https://github.com/WhatsApp/stickers/tree/main/iOS)
+- [WhatsApp Android sticker requirements/provider sample](https://github.com/WhatsApp/stickers/tree/main/Android)
+- [WhatsApp iOS pasteboard protocol](https://github.com/WhatsApp/stickers/tree/main/iOS)
 - [Apple Vision person segmentation](https://developer.apple.com/documentation/vision/vngeneratepersonsegmentationrequest)
 - [ML Kit selfie segmentation](https://developers.google.com/ml-kit/vision/selfie-segmentation/android)
-
-Use photos and videos you have permission to use. Bias Studio is not affiliated with WhatsApp or any artist.

@@ -40,16 +40,16 @@ The connected app used during setup has contents/actions/workflows permissions b
 ## Prepare a candidate
 
 1. Merge the desired code to main through the required checks/review. Wait for all four jobs and `CI gate` to pass for that exact commit.
-2. Complete the physical-device checklist in the root README on both Android and iPhone. The dispatcher must confirm cutout quality and WhatsApp pack import; simulator compilation does not establish either.
+2. Complete the physical-device checklist in [VERIFICATION.md](VERIFICATION.md) on both Android and iPhone. The dispatcher must confirm cutout quality and WhatsApp pack import; simulator compilation does not establish either.
 3. Dispatch the workflow from main, using a new candidate number. The tag's version must match both `package.json` and `app.json`.
 
 ```sh
 gh workflow run release.yml --ref main \
-  -f tag=v1.0.0-rc.1 \
+  -f tag=v1.1.0-rc.1 \
   -f device_smoke_passed=true
 ```
 
-Use the confirmation only after performing those tests. The workflow also refuses stable tags such as `v1.0.0`, existing tags, a stale commit, failed/pending CI, expired/missing artifacts, unprotected main, or missing release reviewers.
+Use the confirmation only after performing those tests. The workflow also refuses stable tags such as `v1.1.0`, existing tags, a stale commit, failed/pending CI, expired/missing artifacts, unprotected main, or missing release reviewers.
 
 After eligibility passes, approve the pending `release` environment deployment in GitHub. The job downloads the original successful CI artifacts, verifies every file's source SHA, run ID, app version, size and SHA-256 against its build manifest, then rechecks main and protection settings after approval. It creates a new tag at that exact source SHA and a **draft prerelease**, with the APK, Simulator zip, browser-preview zip, checksum file, and build evidence. It never overwrites an existing tag or release, rebuilds a different artifact after approval, or uploads to an app store.
 

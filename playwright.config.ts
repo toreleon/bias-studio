@@ -24,6 +24,7 @@ export default defineConfig({
   },
   webServer: {
     command: "npx expo start --web --port 8081",
+    env: { EXPO_PUBLIC_GENERATION_URL: "http://localhost:8787" },
     url: "http://localhost:8081",
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
