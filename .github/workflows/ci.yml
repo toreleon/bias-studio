@@ -1,0 +1,169 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 'true'
+  NODE_ENV: production
+  EXPO_NO_TELEMETRY: '1'
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev
+      - name: Validate workflow syntax and security
+        run: bash scripts/check-workflows.sh
+      - run: npm run check
+      - run: npm run test:release
+
+  web:
+    name: Browser and web build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: npm run export:web
+      - name: Package browser preview
+        run: |
+          mkdir -p artifacts/web
+          (cd dist && zip -qr ../artifacts/web/bias-studio-web-preview.zip .)
+          node scripts/build-manifest.mjs web artifacts/web/bias-studio-web-preview.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-preview
+          path: artifacts/web/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Browser diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  android:
+    name: Android native build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      - run: npm ci --include=dev
+      - name: Install Android build tools
+        run: |
+          printf 'y\n%.0s' {1..100} | sdkmanager --licenses > /dev/null
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006' 'cmake;3.22.1'
+      - run: npx expo prebuild --platform android --no-install
+      - name: Compile native app and run Android release lint
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:lintVitalRelease --no-daemon --console=plain --max-workers=2 -PreactNativeArchitectures=arm64-v8a
+      - name: Verify and package test APK
+        run: |
+          mkdir -p artifacts/android
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/android/bias-studio-arm64-test.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose artifacts/android/bias-studio-arm64-test.apk
+          node scripts/build-manifest.mjs android-test artifacts/android/bias-studio-arm64-test.apk
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-test
+          path: artifacts/android/
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: iOS native build
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev
+      - name: Show native toolchain
+        run: |
+          xcodebuild -version
+          pod --version
+      - run: npx expo prebuild --platform ios --no-install
+      - name: Install native dependencies
+        working-directory: ios
+        run: pod install
+      - name: Build iOS simulator app without signing
+        run: |
+          xcodebuild -workspace ios/BiasStudio.xcworkspace -scheme BiasStudio -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      - name: Package simulator app
+        run: |
+          mkdir -p artifacts/ios
+          ditto -c -k --sequesterRsrc --keepParent build/ios/Build/Products/Release-iphonesimulator/BiasStudio.app artifacts/ios/bias-studio-ios-simulator.zip
+          node scripts/build-manifest.mjs ios-simulator artifacts/ios/bias-studio-ios-simulator.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-simulator
+          path: artifacts/ios/
+          if-no-files-found: error
+          retention-days: 14
+
+  gate:
+    name: CI gate
+    if: ${{ always() }}
+    needs: [quality, web, android, ios]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      RESULTS: ${{ toJSON(needs) }}
+    steps:
+      - name: Require every job to succeed
+        run: |
+          node -e 'const jobs=JSON.parse(process.env.RESULTS); const bad=Object.entries(jobs).filter(([,job])=>job.result!=="success"); if(bad.length){console.error("CI gate failed:",bad.map(([name,job])=>`${name}: ${job.result}`).join(", "));process.exit(1)} console.log("All quality, browser, Android, and iOS checks passed.")'

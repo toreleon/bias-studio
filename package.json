@@ -12,8 +12,10 @@
     "test:e2e": "playwright test",
     "export:web": "expo export --platform web",
     "prebuild": "expo prebuild",
-    "check": "npm run typecheck && npm test",
-    "lint": "expo lint"
+    "check": "npm run lint && npm run typecheck && npm test",
+    "lint": "expo lint --max-warnings 0",
+    "test:release": "node --test tests/release-policy.test.mjs",
+    "github:protect": "node scripts/configure-github.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "^0.4.2",

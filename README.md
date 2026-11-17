@@ -2,6 +2,10 @@
 
 A React Native mobile app for fans to turn photos and selected video frames into personal WhatsApp sticker packs. Working name and original demo artwork are included; no idol photographs are bundled.
 
+[![CI](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml)
+
+CI runs quality checks, browser tests, and Android/iOS native builds. The [release gate guide](docs/RELEASING.md) explains protected main, human approval, immutable CI artifacts, and draft test candidates. GitHub administration settings must be activated separately with `npm run github:protect`; the release workflow blocks until those protections exist.
+
 ## Screenshots
 
 Mobile browser previews using the original demo characters:

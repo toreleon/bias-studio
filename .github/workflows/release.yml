@@ -1,0 +1,87 @@
+name: Release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Candidate tag matching app version, e.g. v1.0.0-rc.1'
+        required: true
+        type: string
+      device_smoke_passed:
+        description: 'I verified person cutout and WhatsApp pack import on Android and iPhone for this commit'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate
+  cancel-in-progress: false
+
+jobs:
+  eligibility:
+    name: Release eligibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.policy.outputs.sha }}
+      tag: ${{ steps.policy.outputs.tag }}
+      ci_run_id: ${{ steps.policy.outputs.ci_run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Require current main, green CI, available artifacts, and a configured human approval
+        id: policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          DEVICE_SMOKE_PASSED: ${{ inputs.device_smoke_passed }}
+        run: node scripts/release-policy.mjs
+
+  candidate:
+    name: Approve and prepare candidate
+    needs: eligibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_SHA: ${{ needs.eligibility.outputs.sha }}
+      RELEASE_TAG: ${{ needs.eligibility.outputs.tag }}
+      CI_RUN_ID: ${{ needs.eligibility.outputs.ci_run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.eligibility.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Download the exact successful CI artifacts
+        run: |
+          gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name android-test --dir incoming/android
+          gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name ios-simulator --dir incoming/ios
+          gh run download "$CI_RUN_ID" --repo "$GH_REPO" --name web-preview --dir incoming/web
+      - name: Verify source, version, and checksums
+        run: node scripts/verify-release-artifacts.mjs
+      - name: Recheck main and approval configuration after review
+        env:
+          DEVICE_SMOKE_PASSED: 'true'
+        run: node scripts/release-policy.mjs
+      - name: Create a draft prerelease for final inspection
+        run: |
+          gh api --method POST "repos/$GH_REPO/git/refs" -f "ref=refs/tags/$RELEASE_TAG" -f "sha=$SOURCE_SHA"
+          gh release create "$RELEASE_TAG" release/* --repo "$GH_REPO" --verify-tag --title "Bias Studio $RELEASE_TAG — test candidate" --notes-file release-notes.md --draft --prerelease
