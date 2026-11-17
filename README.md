@@ -2,7 +2,7 @@
 
 **Turn your favorite moments into a reaction pack—and build a reusable library for your fandom.**
 
-A mobile-first creator workspace for iPhone and Android, built with Expo SDK 54 / React Native, plus a small backend for finished-pack distribution and optional image generation. A browser preview uses the same editor and local workspace. Original illustrative demo characters are included; no celebrity photos are bundled.
+A mobile-first creator workspace for iPhone and Android, built with Expo SDK 58 / React Native, plus a small backend for finished-pack distribution and optional image generation. A browser preview uses the same editor and local workspace. Original illustrative demo characters are included; no celebrity photos are bundled.
 
 [![CI](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml)
 
@@ -45,6 +45,8 @@ Beta mobile-browser screenshots, not physical-device evidence. Generation illust
 | AI sample approval |
 | --- |
 | <img src="docs/screenshots/beta/07-ai-sample.png" width="240" alt="Approve an AI sample before making more reactions" /> |
+
+SDK 58 compatibility and validation are documented in [the upgrade guide](docs/SDK58-UPGRADE.md).
 
 ## Run and test
 

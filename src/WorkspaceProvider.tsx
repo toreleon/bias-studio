@@ -2,6 +2,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -45,7 +46,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState("");
   const locked = useRef(false);
   const [rendering, setRendering] = useState<StickerDesign | null>(null);
-  const capture = useRef<View>(null);
+  const capture = useRef<React.ComponentRef<typeof View>>(null);
   const [renderKey, setRenderKey] = useState(0);
   const pendingRender = useRef<null | (() => void)>(null);
   const history = useRef<Workspace[]>([]);
@@ -54,19 +55,17 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revision = useRef(0);
   const saved = useRef(0);
-  async function boot() {
-    setLoadError("");
-    try {
-      const loaded = await loadWorkspace();
+  function boot() {
+    return loadWorkspace().then((loaded) => {
+      setLoadError("");
       current.current = loaded;
       setData(loaded);
       setReady(true);
-    } catch (e) {
-      setLoadError(
-        e instanceof Error ? e.message : "Unable to open your workspace.",
-      );
-    }
+    }).catch((error: unknown) => {
+      setLoadError(error instanceof Error ? error.message : "Unable to open your workspace.");
+    });
   }
+
   useEffect(() => {
     void boot();
   }, []);
@@ -85,7 +84,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }
   const flushRef = useRef(flush);
-  flushRef.current = flush;
+  useLayoutEffect(() => { flushRef.current = flush; });
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") void flushRef.current().catch(() => {});

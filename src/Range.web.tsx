@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import type { SliderProps } from "@react-native-community/slider";
 /** Use the browser's keyboard-accessible range control in the preview. */
 export default function Range(props: SliderProps) {
   const [value, setValue] = useState(props.value || 0);
-  useEffect(() => setValue(props.value || 0), [props.value]);
+  const [previous, setPrevious] = useState(props.value);
+  if (previous !== props.value) {
+    setPrevious(props.value);
+    setValue(props.value || 0);
+  }
   return (
     <input
       type="range"

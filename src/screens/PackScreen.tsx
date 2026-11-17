@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import {
@@ -108,7 +108,7 @@ export function PackScreen() {
     );
   }
   const importRef = useRef(importMedia);
-  importRef.current = importMedia;
+  useLayoutEffect(() => { importRef.current = importMedia; });
   useEffect(() => {
     if (!started.current && pack && importKind) {
       started.current = true;

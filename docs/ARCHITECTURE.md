@@ -1,6 +1,6 @@
 # Creator workspace and beta service architecture
 
-The app is an Expo SDK 54 / React Native local workspace with a supporting Node service. Expo Router owns `src/app/` routes: Home, Library, Packs, Create `[id]`, Pack `[id]`, Edit `[id]?item=…`, Preview `[id]` and Receive `[id]`. The shared workspace provider handles local state; screens and services live outside route files. Generated native projects remain disposable/untracked.
+The app is an Expo SDK 58 / React Native local workspace with a supporting Node service. Expo Router owns `src/app/` routes: Home, Library, Packs, Create `[id]`, Pack `[id]`, Edit `[id]?item=…`, Preview `[id]` and Receive `[id]`. The shared workspace provider handles local state; screens and services live outside route files. Generated native projects remain disposable/untracked.
 
 The service implements authenticated generation, finished-pack publishing and Telegram export. It is **not a deployed endpoint or editable-library sync service**. Use [BETA-DEPLOYMENT.md](BETA-DEPLOYMENT.md) for operations and [BETA-VERIFICATION.md](BETA-VERIFICATION.md) for actual evidence. The original [audit](research/product-audit.md) describes its stated baseline commit, not the subsequently added beta code.
 

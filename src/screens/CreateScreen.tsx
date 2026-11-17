@@ -67,8 +67,6 @@ export function CreateScreen() {
     },
     [],
   );
-  const latest = useRef(draft);
-  latest.current = draft;
   function update(fn: (d: Creation) => Creation) {
     store.change((old) => ({
       ...old,
@@ -154,7 +152,7 @@ export function CreateScreen() {
   }
   async function generate(targets: Feeling[]) {
     if (active.current) return;
-    const snapshot = latest.current!;
+    const snapshot = store.snapshot().creations!.find((creation) => creation.id === id)!;
     const controller = new AbortController();
     active.current = controller;
     stopReason.current = "";
@@ -241,7 +239,7 @@ export function CreateScreen() {
   }
   async function importResults() {
     await store.run("Opening your images…", async () => {
-      const snapshot = latest.current!;
+      const snapshot = store.snapshot().creations!.find((creation) => creation.id === id)!;
       const images = await pickMany("photo", 24 - snapshot.candidates.length);
       if (!images.length) return;
       const candidates: Candidate[] = [];
