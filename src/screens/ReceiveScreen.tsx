@@ -16,19 +16,22 @@ type PublicPack = {
 };
 export function ReceiveScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [attempt, setAttempt] = useState(0);
+  return <ReceiveCollection key={`${id}-${attempt}`} id={id} onRetry={() => setAttempt(n => n + 1)} />;
+}
+function ReceiveCollection({ id, onRetry }: { id: string; onRetry: () => void }) {
   const store = useWorkspace();
   const [pack, setPack] = useState<PublicPack | null>(null);
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
+  const validId = !!id && /^[a-zA-Z0-9-]{1,120}$/.test(id);
+  const [error, setError] = useState(validId ? "" : "This collection link is invalid.");
   const [imported, setImported] = useState("");
   useEffect(() => {
     const controller = new AbortController();
-    setError(""); setPack(null);
-    if (!id || !/^[a-zA-Z0-9-]{1,120}$/.test(id)) { setError("This collection link is invalid."); return; }
+    if (!validId) return;
     betaRequest<PublicPack>(`/public/packs/${id}`, { signal: controller.signal })
       .then(setPack).catch(e => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Unable to open this collection."); });
     return () => controller.abort();
-  }, [id, attempt]);
+  }, [id, validId]);
   async function receive() {
     await store.run("Downloading finished stickers…", async () => {
       if (imported) { await store.flush(); router.push(`/preview/${imported}`); return; }
@@ -51,7 +54,7 @@ export function ReceiveScreen() {
   }
   return <Shell back={() => router.replace("/packs")} tab={false}>
     <T style={v.eyebrow}>A COLLECTION FOR YOUR CHAT</T>
-    {error ? <><T style={v.sub}>{error}</T><Action label="Try opening collection again" onPress={() => setAttempt(n => n + 1)} /></> : !pack ? <T accessibilityLiveRegion="polite">Loading collection…</T> : <>
+    {error ? <><T style={v.sub}>{error}</T><Action label="Try opening collection again" onPress={onRetry} /></> : !pack ? <T accessibilityLiveRegion="polite">Loading collection…</T> : <>
       <T style={v.title}>{pack.name}</T>
       <T style={v.sub}>Created by {pack.publisher} · {pack.stickers.length} reactions</T>
       <View style={v.wrap}>{pack.stickers.map((sticker, i) => <Image key={i} accessibilityLabel={`Reaction ${i + 1}`} source={{ uri: sticker.imageURL }} style={{ width: 140, height: 140 }} resizeMode="contain" />)}</View>

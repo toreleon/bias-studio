@@ -208,7 +208,7 @@ export function Shell({
   footer?: React.ReactNode;
   scrollKey?: number;
 }) {
-  const scroller = useRef<ScrollView>(null);
+  const scroller = useRef<React.ComponentRef<typeof ScrollView>>(null);
   useEffect(() => {
     scroller.current?.scrollTo({ y: 0, animated: false });
   }, [scrollKey]);

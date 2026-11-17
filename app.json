@@ -6,12 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FBFAFC"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "studio.bias.app",
@@ -27,7 +21,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F0E7FB"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "studio.bias.app",
       "blockedPermissions": [
@@ -36,7 +29,8 @@
       "allowBackup": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "single"
     },
     "plugins": [
       "expo-font",
@@ -48,7 +42,15 @@
           "microphonePermission": false
         }
       ],
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FBFAFC"
+        }
+      ]
     ],
     "scheme": "biasstudio"
   }

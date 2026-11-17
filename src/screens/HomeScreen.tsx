@@ -37,13 +37,13 @@ function useStart() {
     }
     // Open the system picker directly from the tap, before navigation loses activation.
     let prepared: ReturnType<typeof newCollection> | undefined;
-    await store.run("Opening your media…", async () => {
-      const media = await pickMany(kind);
+    await store.run("Opening your media…", async (task) => {
+      const media = await pickMany(kind, 30, task);
       if (!media.length) return;
       const pack = newCollection();
       stageImport(pack.id, media);
       prepared = pack;
-    });
+    }, { cancellable: true });
     // Release the global operation lock before the destination consumes the media.
     if (prepared) open(prepared);
   };

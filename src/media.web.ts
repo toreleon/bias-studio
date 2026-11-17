@@ -1,5 +1,6 @@
 import { LIMITS, Pack, Sticker, StickerDesign, newId } from "./domain";
 import { scene } from "./scene";
+import { waitForImport, type ImportTaskOptions } from "./import-task";
 export interface Media {
   uri: string;
   kind: "photo" | "video";
@@ -12,8 +13,10 @@ export async function pickMedia(kind: Media["kind"]): Promise<Media | null> {
 export async function pickMany(
   kind: Media["kind"],
   limit = 30,
+  options: ImportTaskOptions = {},
 ): Promise<Media[]> {
-  const files = await new Promise<File[]>((resolve) => {
+  options.onProgress?.("Waiting for your selection…");
+  const files = await waitForImport(new Promise<File[]>((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = kind === "photo";
@@ -21,16 +24,17 @@ export async function pickMany(
     input.onchange = () => resolve(Array.from(input.files || []));
     input.oncancel = () => resolve([]);
     input.click();
-  });
+  }), options);
   if (files.length > limit)
     throw new Error(`Choose up to ${limit} photos for this pack.`);
   const items: Media[] = [];
-  for (const file of files) {
+  for (const [index, file] of files.entries()) {
+    options.onProgress?.(`Preparing ${kind === "photo" ? "photo" : "video"} ${index + 1} of ${files.length}…`);
     if (file.size > 150 * 1024 * 1024)
       throw new Error("Choose a file smaller than 150 MB.");
     if (kind === "video") {
       const uri = URL.createObjectURL(file);
-      const duration = await new Promise<number>((resolve, reject) => {
+      const duration = await waitForImport(new Promise<number>((resolve, reject) => {
         const video = document.createElement("video");
         video.preload = "metadata";
         video.onloadedmetadata = () => {
@@ -45,18 +49,18 @@ export async function pickMany(
           );
         };
         video.src = uri;
-      });
+      }), options, 45000, "This video took too long to read. Try a shorter clip.").catch(error => { URL.revokeObjectURL(uri); throw error; });
       items.push({ uri, kind, duration, name: file.name });
     } else {
-      const uri = await new Promise<string>((resolve, reject) => {
+      const uri = await waitForImport(new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = () =>
           reject(new Error("This photo could not be read."));
         reader.readAsDataURL(file);
-      });
+      }), options, 45000, "This photo took too long to read. Try another photo.");
       items.push({
-        uri: await persistImage(uri),
+        uri: await waitForImport(persistImage(uri), options, 45000, "This photo took too long to prepare. Try importing one photo at a time."),
         kind,
         duration: 0,
         name: file.name,

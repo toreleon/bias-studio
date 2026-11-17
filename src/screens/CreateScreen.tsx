@@ -21,6 +21,7 @@ import { useWorkspace } from "../WorkspaceProvider";
 import { defaultDesign, newId } from "../domain";
 import { newCollection, reaction } from "../workspace";
 import { imageData, pickMany, prepareGeneratedImage } from "../media";
+import { waitForImport } from "../import-task";
 import {
   Candidate,
   Creation,
@@ -67,8 +68,6 @@ export function CreateScreen() {
     },
     [],
   );
-  const latest = useRef(draft);
-  latest.current = draft;
   function update(fn: (d: Creation) => Creation) {
     store.change((old) => ({
       ...old,
@@ -154,7 +153,7 @@ export function CreateScreen() {
   }
   async function generate(targets: Feeling[]) {
     if (active.current) return;
-    const snapshot = latest.current!;
+    const snapshot = store.snapshot().creations!.find((creation) => creation.id === id)!;
     const controller = new AbortController();
     active.current = controller;
     stopReason.current = "";
@@ -240,9 +239,9 @@ export function CreateScreen() {
     }
   }
   async function importResults() {
-    await store.run("Opening your images…", async () => {
-      const snapshot = latest.current!;
-      const images = await pickMany("photo", 24 - snapshot.candidates.length);
+    await store.run("Opening your images…", async (task) => {
+      const snapshot = store.snapshot().creations!.find((creation) => creation.id === id)!;
+      const images = await pickMany("photo", 24 - snapshot.candidates.length, task);
       if (!images.length) return;
       const candidates: Candidate[] = [];
       for (let i = 0; i < images.length; i++) {
@@ -250,7 +249,7 @@ export function CreateScreen() {
           snapshot.feelings[i % snapshot.feelings.length] || "love";
         candidates.push({
           id: newId(),
-          uri: await prepareGeneratedImage(images[i].uri),
+          uri: await waitForImport(prepareGeneratedImage(images[i].uri), task, 45000, "This photo took too long to prepare. Try importing one photo at a time."),
           feeling,
           selected: true,
           caption: snapshot.captions
@@ -267,7 +266,7 @@ export function CreateScreen() {
       update((d) => ({ ...d, candidates: [...d.candidates, ...candidates] }));
       setStep(2);
       setError("");
-    });
+    }, { cancellable: true });
   }
   async function makePack() {
     await store.run("Saving your favorites…", async () => {
@@ -477,15 +476,13 @@ export function CreateScreen() {
               }
               icon={ImagePlus}
               onPress={() =>
-                store.run("Opening reference…", async () => {
-                  const photos = await pickMany("photo", 1);
+                store.run("Opening reference…", async (task) => {
+                  const photos = await pickMany("photo", 1, task);
                   if (photos[0]) {
-                    const reference = await prepareGeneratedImage(
-                      photos[0].uri,
-                    );
+                    const reference = await waitForImport(prepareGeneratedImage(photos[0].uri), task, 45000, "This reference photo took too long to prepare. Try another photo.");
                     update((d) => ({ ...d, reference }));
                   }
-                })
+                }, { cancellable: true })
               }
             />
             {draft.reference && (

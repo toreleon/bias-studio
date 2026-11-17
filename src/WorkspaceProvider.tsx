@@ -2,6 +2,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -19,6 +20,7 @@ import { Sticker, StickerDesign } from "./domain";
 import { discardSticker, imageData, renderSticker } from "./media";
 import { scene } from "./scene";
 import { Button, T } from "./ui";
+import type { ImportTaskOptions } from "./import-task";
 
 type Store = {
   data: Workspace;
@@ -29,7 +31,7 @@ type Store = {
   canUndo: boolean;
   status: string;
   flush: () => Promise<void>;
-  run: (label: string, fn: () => Promise<void>) => Promise<void>;
+  run: (label: string, fn: (task: ImportTaskOptions) => Promise<void>, options?: { cancellable?: boolean }) => Promise<void>;
   notice: (message: string) => void;
   render: (pack: Collection) => Promise<Sticker[]>;
 };
@@ -44,8 +46,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState("");
   const locked = useRef(false);
+  const activeOperation = useRef<AbortController | null>(null);
+  const [canCancel, setCanCancel] = useState(false);
   const [rendering, setRendering] = useState<StickerDesign | null>(null);
-  const capture = useRef<View>(null);
+  const capture = useRef<React.ComponentRef<typeof View>>(null);
   const [renderKey, setRenderKey] = useState(0);
   const pendingRender = useRef<null | (() => void)>(null);
   const history = useRef<Workspace[]>([]);
@@ -54,19 +58,17 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const revision = useRef(0);
   const saved = useRef(0);
-  async function boot() {
-    setLoadError("");
-    try {
-      const loaded = await loadWorkspace();
+  function boot() {
+    return loadWorkspace().then((loaded) => {
+      setLoadError("");
       current.current = loaded;
       setData(loaded);
       setReady(true);
-    } catch (e) {
-      setLoadError(
-        e instanceof Error ? e.message : "Unable to open your workspace.",
-      );
-    }
+    }).catch((error: unknown) => {
+      setLoadError(error instanceof Error ? error.message : "Unable to open your workspace.");
+    });
   }
+
   useEffect(() => {
     void boot();
   }, []);
@@ -85,7 +87,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }
   const flushRef = useRef(flush);
-  flushRef.current = flush;
+  useLayoutEffect(() => { flushRef.current = flush; });
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state !== "active") void flushRef.current().catch(() => {});
@@ -138,24 +140,37 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       ),
     }));
   }
-  async function run(label: string, fn: () => Promise<void>) {
+  async function run(
+    label: string,
+    fn: (task: ImportTaskOptions) => Promise<void>,
+    options: { cancellable?: boolean } = {},
+  ) {
     if (locked.current) return;
     locked.current = true;
+    const controller = new AbortController();
+    activeOperation.current = controller;
+    setCanCancel(!!options.cancellable);
     setBusy(label);
     try {
-      await fn();
-    } catch (e) {
-      setMessage(
-        e instanceof Error
-          ? e.message
-          : "Something went wrong. Your draft is safe. Try again.",
+      await fn({
+        signal: controller.signal,
+        onProgress: (next) => {
+          if (activeOperation.current === controller && !controller.signal.aborted) setBusy(next);
+        },
+      });
+    } catch (error) {
+      if (!controller.signal.aborted) setMessage(
+        error instanceof Error ? error.message : "Something went wrong. Your draft is safe. Try again.",
       );
     } finally {
+      activeOperation.current = null;
       locked.current = false;
+      setCanCancel(false);
       setBusy("");
       setRendering(null);
     }
   }
+
   async function render(pack: Collection) {
     const result: Sticker[] = [];
     try {
@@ -229,15 +244,17 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-      <Modal
-        visible={!!busy}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {}}
-      >
+      {/* Keep progress inside the app view: a second native modal can race
+          iOS Photos presentation/dismissal and leave its promise unresolved. */}
+      {!!busy && (
         <View
+          testID="workspace-progress-overlay"
+          accessibilityViewIsModal
           style={{
-            flex: 1,
+            position: "absolute",
+            top: 0, right: 0, bottom: 0, left: 0,
+            zIndex: 1000,
+            elevation: 1000,
             backgroundColor: "#211832DD",
             alignItems: "center",
             justifyContent: "center",
@@ -274,9 +291,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
               </View>
             )}
             <T style={{ fontSize: 12 }}>Your draft stays on this device.</T>
+            {canCancel && <Button label="Cancel import" onPress={() => activeOperation.current?.abort()} />}
           </View>
         </View>
-      </Modal>
+      )}
       <Modal
         visible={!!message}
         transparent

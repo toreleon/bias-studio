@@ -6,6 +6,7 @@ import * as Sharing from "expo-sharing";
 import { captureRef } from "react-native-view-shot";
 import { Platform } from "react-native";
 import { nativeBridge } from "./bridge";
+import { assertImportActive, ImportTaskOptions, waitForImport } from "./import-task";
 import {
   LIMITS,
   Pack,
@@ -27,8 +28,12 @@ export async function pickMedia(kind: Media["kind"]): Promise<Media | null> {
 export async function pickMany(
   kind: Media["kind"],
   limit = 30,
+  options: ImportTaskOptions = {},
 ): Promise<Media[]> {
-  const result = await ImagePicker.launchImageLibraryAsync({
+  assertImportActive(options);
+  options.onProgress?.("Waiting for Photos…");
+  assertImportActive(options);
+  const result = await waitForImport(ImagePicker.launchImageLibraryAsync({
     mediaTypes: kind === "video" ? ["videos"] : ["images"],
     quality: 1,
     allowsEditing: false,
@@ -36,34 +41,110 @@ export async function pickMany(
     selectionLimit: limit,
     orderedSelection: true,
     exif: false,
-  });
+    // SDK 58 copies the current representation when possible, avoiding an
+    // expensive full-resolution conversion before our bounded image decode.
+    preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
+  }), options);
+  assertImportActive(options);
   if (result.canceled) return [];
   if (result.assets.length > limit)
     throw new Error(`Choose up to ${limit} photos for this pack.`);
   const items: Media[] = [];
-  for (const asset of result.assets) {
-    if (kind === "video")
-      items.push({
-        uri: asset.uri,
-        kind,
-        duration: Math.max(0, (asset.duration || 0) / 1000),
-        name: asset.fileName || "Video",
-      });
-    else {
-      const resized = await ImageManipulator.manipulateAsync(
-        asset.uri,
-        [{ resize: boundedDimensions(asset.width, asset.height) }],
-        { format: ImageManipulator.SaveFormat.PNG },
-      );
-      items.push({
-        uri: await persistImage(resized.uri),
-        kind,
-        duration: 0,
-        name: asset.fileName || "Photo",
-      });
+  try {
+    for (let index = 0; index < result.assets.length; index++) {
+      assertImportActive(options);
+      const asset = result.assets[index];
+      if (kind === "video")
+        items.push({
+          uri: asset.uri,
+          kind,
+          duration: Math.max(0, (asset.duration || 0) / 1000),
+          name: asset.fileName || "Video",
+        });
+      else {
+        const uri = await prepareImportedPhoto(asset.uri, index + 1, result.assets.length, options);
+        // Register the new file before checking cancellation so the catch path
+        // can remove every uncommitted file, including this last completed one.
+        items.push({ uri, kind, duration: 0, name: asset.fileName || "Photo" });
+        assertImportActive(options);
+      }
     }
+    assertImportActive(options);
+    return items;
+  } catch (error) {
+    for (const item of items) {
+      if (item.kind === "photo") discardImportFile(item.uri);
+    }
+    throw error;
   }
-  return items;
+}
+
+function discardImportFile(uri: string) {
+  // Cleanup must not delay cancellation or replace the useful import error.
+  void FS.deleteAsync(uri, { idempotent: true }).catch(() => {});
+}
+
+async function prepareImportedPhoto(
+  uri: string,
+  index: number,
+  count: number,
+  options: ImportTaskOptions,
+): Promise<string> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  options.signal?.addEventListener("abort", abort, { once: true });
+  if (options.signal?.aborted) abort();
+  const task = { ...options, signal: controller.signal };
+  let destination: string | undefined;
+  const processing = (async () => {
+    assertImportActive(task);
+    task.onProgress?.(`Preparing photo ${index} of ${count}…`);
+    assertImportActive(task);
+    const context = ImageManipulator.ImageManipulator.manipulate(uri, {
+      maxWidth: 1200,
+      maxHeight: 1200,
+    });
+    let image: ImageManipulator.ImageRef | undefined;
+    let temporary: string | undefined;
+    try {
+      image = await context.renderAsync();
+      assertImportActive(task);
+      task.onProgress?.(`Saving photo ${index} of ${count}…`);
+      assertImportActive(task);
+      const encoded = await image.saveAsync({ format: ImageManipulator.SaveFormat.PNG });
+      temporary = encoded.uri;
+      assertImportActive(task);
+      const root = `${FS.documentDirectory}sources/`;
+      await FS.makeDirectoryAsync(root, { intermediates: true });
+      assertImportActive(task);
+      destination = `${root}${newId()}.png`;
+      await FS.copyAsync({ from: temporary, to: destination });
+      assertImportActive(task);
+      return destination;
+    } catch (error) {
+      if (destination) discardImportFile(destination);
+      throw error;
+    } finally {
+      if (temporary) discardImportFile(temporary);
+      // A cancelled native operation may settle later. Keep its references
+      // alive until that point, then release them without returning late work.
+      try { image?.release(); } catch { /* Already released by native teardown. */ }
+      try { context.release(); } catch { /* Already released by native teardown. */ }
+    }
+  })();
+  try {
+    const result = await waitForImport(processing, task, 45000,
+      `Photo ${index} took too long to prepare. Your existing workspace is unchanged. Try fewer photos or save the photo on this device before retrying.`);
+    assertImportActive(task);
+    return result;
+  } catch (error) {
+    controller.abort();
+    if (destination) discardImportFile(destination);
+    if (error instanceof Error && ["AbortError", "ImportTimeoutError"].includes(error.name)) throw error;
+    throw new Error(`Photo ${index} could not be prepared or saved. Your existing workspace is unchanged. Check free storage, then try this photo again or choose another.`);
+  } finally {
+    options.signal?.removeEventListener("abort", abort);
+  }
 }
 export async function persistImage(uri: string): Promise<string> {
   if (uri.startsWith("data:")) {
