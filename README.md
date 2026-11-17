@@ -2,76 +2,80 @@
 
 **Turn your favorite moments into a reaction pack—and build a reusable library for your fandom.**
 
-A mobile-first creator workspace for iPhone and Android, built on Expo SDK 54 / React Native. The browser preview uses the same editor and workspace. Original illustrative demo characters are included; no celebrity photos are bundled.
+A mobile-first creator workspace for iPhone and Android, built with Expo SDK 54 / React Native, plus a small backend for finished-pack distribution and optional image generation. A browser preview uses the same editor and local workspace. Original illustrative demo characters are included; no celebrity photos are bundled.
 
 [![CI](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/toreleon/bias-studio/actions/workflows/ci.yml)
 
-## Generative reaction studio (1.2)
+## Beta scope and evidence
 
-Create with AI → subject/reference → visual direction + reaction lineup → compare favorites → editable pack → chat preview/export. Recipes save automatically and can be reused through Home or Library → AI recipes. In-app generation requires the optional server connection; disconnected builds support briefs and importing results without pretending generation succeeded.
+The creator workflow, rendered-only sharing, public collection service, Telegram adapter and durable generation jobs are implemented in this repository. **The public service is not deployed by this change.** Live Telegram creation needs a configured bot/webhook; physical WhatsApp installation and sending remain device-validation gates. Mock provider tests do not establish live model quality or recipient success. See [current beta verification](docs/BETA-VERIFICATION.md) for exact results, builds and blockers.
 
-- [Mobile competitor UX research and design decisions](docs/GENERATIVE-UX-RESEARCH.md)
-- [GPT Image service setup and phone deployment](docs/GENERATION-SETUP.md)
-- [Verification and remaining real-device checks](docs/VERIFICATION.md)
+- [Beta strategy](docs/BETA-STRATEGY.md) and [consent-based pilot protocol](docs/PILOT.md)
+- [Deployment and operational checklist](docs/BETA-DEPLOYMENT.md)
+- [Generation setup](docs/GENERATION-SETUP.md), [product behavior](docs/PRODUCT.md) and [architecture](docs/ARCHITECTURE.md)
+- Research: [direct competitors](docs/research/direct-competitors.md), [platforms](docs/research/platform-competitors.md), [baseline audit](docs/research/product-audit.md) and [strategy challenge](docs/research/strategy-challenge.md)
 
-The live browser pilot generated three reference-based reactions with `gpt-image-1.5`, reopened them, made a pack, saved the library assets, exported a ZIP and reused the recipe. Automated tests use fixture responses and make no paid provider calls.
+Competitors already offer editing, packs, generation and distribution. Faster repeated creation, useful reusable libraries and recipient adoption are hypotheses to validate—not established differentiation, retention or willingness to pay.
 
-## What works
+## Creator and recipient workflows
 
-- Start immediately, name later, and resume automatically saved, editable drafts.
-- Import multiple photos or select several **still frames** from a video. Preserve the frame timestamps and source name.
-- Style selected reactions together: fonts, caption placement, outline width/color, ink, frames, accent colors and decoration. Save a style for future packs.
-- Refine individual captions and crop; native person cutout; manual erase/restore brushes; undo; accessible earlier/later reordering.
-- Save editable reactions to a reusable library, with optional fandom, member/character, era/event and emotion tags. Search/filter, duplicate and reuse independent copies across packs.
-- Preview every sticker at 148 logical pixels against light/dark chat backgrounds.
-- Native WhatsApp handoff with 3–30 validated, transparent 512 × 512 WebP files, ≤100 KiB each, plus a 96 × 96 PNG tray icon ≤50 KiB. The app reports **handoff**, never unverified installation.
-- Export one portable ZIP containing editable designs, original/cutout images, captions, tags, timestamps, creator credit, collection identity and ready-rendered WebP stickers. Import it on another installation through **Packs → Import pack file**.
-- Preserve v1 packs and the original storage key during migration. Legacy stickers remain reusable as flattened images; their baked-in text cannot be independently edited.
+- Start immediately, name later, and resume locally autosaved drafts. Import multiple photos or choose several **still frames** from a video, preserving source names/timestamps.
+- Batch-style selected reactions; refine captions/crop, person cutouts and erase/restore masks; undo and reorder. Save editable assets and styles, organize optional fandom/member/era/emotion tags, and reuse independent copies in another pack.
+- Preview at realistic chat sizes. Share a **finished-only ZIP** by default; editable backup sharing is a separate explicit choice containing sources and authoring metadata.
+- Native WhatsApp handoff validates 3–30 static 512 × 512 WebP stickers, each ≤100 KiB, and a 96 × 96 tray PNG ≤50 KiB. Confirm Add inside WhatsApp, then send a sticker there.
+- With a connected beta service, explicitly publish finished renders, chosen credit and the disclosed creator account label to an anonymous collection page, or link Telegram and create a real sticker set. Public pages can be unpublished; downloaded copies and Telegram sets are separate and cannot be recalled by hiding a page.
+- Optional AI creation starts with one sample for approval, then selected reactions, individual variations and independent captions. Saved recipes and generation request IDs support reuse and recovery. The beta service defaults to `gpt-image-2.6-sunburst`; model availability and output quality still require bounded live validation.
 
-Automatic person cutout uses Apple Vision on iOS and bundled ML Kit person segmentation on Android. Manual correction works on both platforms and in the browser. There is no animated output, production account system, public page, cloud sync, marketplace or subscription. An optional controlled-pilot generation server is included. Drafts stay on the device; generation uploads only the description and reference after explicit confirmation. A shared ZIP deliberately contains the editable source assets; the app explains this before sharing.
+**Saved locally**, **destination opened/handoff**, and **pack installed and used** are different states. A file download, published page, verified Telegram set or opened WhatsApp does not prove that the recipient added or sent a sticker.
+
+Drafts remain local. Publishing sends final rendered images, public credit and the disclosed creator account label only. An explicit AI request sends its description/reference to the private service and provider; job results are retained for recovery under the operator's retention policy. Provider credentials never belong in the app. No broad feed, marketplace, subscription, team workspace, cloud library sync or animated output is offered.
 
 ## Main screens
 
-Actual 390px mobile **browser** captures of the implemented app; these are not physical-device screenshots.
+Beta mobile-browser screenshots, not physical-device evidence. Generation illustrations/fixtures and capture provenance are identified in [beta verification](docs/BETA-VERIFICATION.md). Earlier screenshots under `docs/screenshots/ai/` and the original screen files remain historical assets.
 
-The AI screenshots below use actual GPT Image results from the live test, not fixture output.
-
-| Idea and reference | Visual direction | Generated favorites |
+| Home | Pack | Editor |
 | --- | --- | --- |
-| <img src="docs/screenshots/ai/02-idea.png" width="220" alt="Saved subject and reference composer" /> | <img src="docs/screenshots/ai/03-look.png" width="220" alt="Visual styles and reaction choices" /> | <img src="docs/screenshots/ai/04-results.png" width="220" alt="Three actual GPT Image reactions with favorite selection" /> |
+| <img src="docs/screenshots/beta/01-home.png" width="220" alt="Home and recent creator work" /> | <img src="docs/screenshots/beta/02-pack.png" width="220" alt="Multi-reaction pack with batch tools" /> | <img src="docs/screenshots/beta/03-editor.png" width="220" alt="Individual reaction refinement" /> |
 
-| Pack preview | Reusable recipes |
-| --- | --- |
-| <img src="docs/screenshots/ai/07-chat.png" width="220" alt="AI reactions in chat preview" /> | <img src="docs/screenshots/ai/08-recipes.png" width="220" alt="Saved AI recipes in the library" /> |
-
-| Home | Reaction library | Pack |
+| Library | Preview and sharing | Public collection |
 | --- | --- | --- |
-| <img src="docs/screenshots/01-home.png" width="220" alt="Home with a start-pack action and recent work" /> | <img src="docs/screenshots/02-library.png" width="220" alt="Searchable reaction library" /> | <img src="docs/screenshots/03-pack.png" width="220" alt="Multi-sticker pack with selection and refinement" /> |
+| <img src="docs/screenshots/beta/04-library.png" width="220" alt="Reusable reaction library" /> | <img src="docs/screenshots/beta/05-preview.png" width="220" alt="Chat preview and honest sharing choices" /> | <img src="docs/screenshots/beta/06-public-pack.png" width="220" alt="Anonymous rendered-only collection preview" /> |
 
-| Individual editor | Chat preview |
-| --- | --- |
-| <img src="docs/screenshots/04-editor.png" width="240" alt="Large sticker canvas and caption controls" /> | <img src="docs/screenshots/05-preview.png" width="240" alt="Sticker reactions at chat size" /> |
+| AI sample approval |
+| --- |
+| <img src="docs/screenshots/beta/07-ai-sample.png" width="240" alt="Approve an AI sample before making more reactions" /> |
 
 ## Run and test
 
-Use Node 22 and npm:
+Use **Node 22.16 or newer**; the beta service uses built-in SQLite. For the offline creator workspace:
 
 ```sh
 npm ci
 npm run web
 ```
 
-Open the Expo URL (port 8081). Try the three-reaction demo or import PNG/JPEG photos and an MP4 video. The preview supports real editing, saving, importing/exporting pack files and downloads. Native WhatsApp actions are not displayed in the browser. Browser storage quotas apply; clearing site data removes that browser's workspace. Use pack files as portable copies.
+For local online features, follow [generation setup](docs/GENERATION-SETUP.md) to create a private environment file and creator invite, then run the service and app in separate terminals:
 
 ```sh
-npm run check                 # zero-warning lint, TypeScript, domain/workspace tests
-npm run test:release          # fail-closed release-policy tests
-npx playwright install chromium
-CI=1 npm run test:e2e         # creator workflows, migration, failures, screenshots
-npm run export:web           # production browser bundle
+npm run beta:serve
 ```
 
-If Chromium is already installed, use `CHROMIUM_PATH=/usr/bin/chromium CI=1 npm run test:e2e`. Production web hosting needs an SPA fallback to `index.html` for Expo Router deep links; `npx serve -s dist` is suitable for a local exported preview.
+```sh
+EXPO_PUBLIC_BETA_URL=http://localhost:8788 npm run web
+```
+
+An API key is optional for testing local publishing; it is needed for real generation. Telegram actions require the configured bot integration. A localhost URL is not a publicly reachable collection service. `npm run generation:serve` is the **legacy local adapter harness**, not the authenticated beta backend used by the current UI.
+
+```sh
+npm run check                 # lint, TypeScript, workspace and beta service tests
+npm run test:release          # release-policy tests
+npx playwright install chromium
+CI=1 npm run test:e2e         # creator/recipient browser flows with test providers
+npm run export:web
+```
+
+If Chromium is installed, use `CHROMIUM_PATH=/usr/bin/chromium CI=1 npm run test:e2e`. Expo Router web hosting needs an SPA fallback to `index.html`; backend `/p/...` pages and API routes must reach the beta service. See the deployment guide for the actual hosting boundary.
 
 ## Build for phones
 
@@ -105,15 +109,16 @@ For unsigned simulator testing use `--platform ios --profile ios-simulator`. Sim
 
 ## Acceptance walkthrough
 
-1. On Home, choose **Import photos**, select three images, and enter the pack immediately. No name is required.
-2. Use **Style selected** to choose a font/color/placement. Enter a style name and save it. Refine one reaction's caption or cutout; the others stay intact.
-3. Optionally organize reactions with fandom/member/era/emotion tags. **Save to library** snapshots the selected editable designs. Save again after later refinements to update those library copies.
-4. Name the collection and add creator credit. Wait for **Saved on this device**, close the app, then reopen the draft from Home.
-5. Open **Library**, search/filter, select reactions, then **New pack from … reactions**. Apply your saved style from the new pack's styling panel. These are independent copies; editing the second pack preserves the first.
-6. **Preview in chat**, then share/download a pack ZIP. On another installation, open **Packs → Import pack file**. It remains a private collection until shared again.
-7. In the native app, use **Add to WhatsApp** once the pack has 3–30 stickers. Confirm inside WhatsApp, then send the stickers there. A file share or return to Bias Studio is not proof of installation.
+1. Import several photos or video moments. Style the selection, refine one reaction and save a named style.
+2. Save useful reactions to Library, optionally add tags, and add collection name/creator credit when ready.
+3. Wait for **Saved on this device**, close/reopen, and verify the same draft and timestamps.
+4. Search Library, create a second pack from saved reactions and apply the saved style. Edit the second pack and verify the first remains unchanged.
+5. Preview in chat. Share a finished-only ZIP; on another installation use **Packs → Import pack file**. Sources and editable layers are shared only through the separate editable option.
+6. On a supported native build, choose **Add to WhatsApp**, confirm inside WhatsApp, and send a sticker. Record actual success separately from handoff.
+7. With a configured service/invite, publish a finished collection and open its page without signing in. If Telegram is configured, connect through the bot, create the set, open it as a recipient and confirm add/send there. Unpublish and verify the Bias page becomes unavailable.
+8. For optional AI, approve one sample, generate selected reactions, pause/reopen and recover saved requests. A new variation is a separate attempt; recovery reuses the existing request.
 
-The test suite automates the two-pack acceptance scenario. Faster second-pack creation is a product hypothesis, not a measured user-study result. See [product direction and validation](docs/PRODUCT.md), [architecture and data](docs/ARCHITECTURE.md), and [verification/device checklist](docs/VERIFICATION.md).
+The software acceptance scenario does not prove a faster second pack for real creators. Use [PILOT.md](docs/PILOT.md) to measure effort, corrections, recipient use, voluntary return and cost per unique retained output.
 
 ## CI and release safety
 
@@ -123,19 +128,23 @@ Test artifacts are an ARM64 Android APK using the template debug key, an unsigne
 
 ## Known boundaries
 
-- Automatic cutout targets people. Brush corrections are in canvas coordinates; crop first, then refine edges. Undo history (20 workspace snapshots) lasts for the current session; designs and strokes persist across restarts.
-- Frames already added to a draft persist. The video-selection sheet is temporary: finish **Add frames to pack** before closing. Reimport a video to select additional frames later. Video decoding depends on OS/browser codec support.
-- Browser image data can exhaust local storage; unsaved changes stay in memory, the status shows **Not saved**, and retry is available. Do not close while that status is shown. Native sources and cutouts use app document storage, not expiring picker/cache paths.
-- Pack ZIPs are limited to 32 MiB compressed / 60 MiB metadata. They include original media images; video files themselves are not shared. No public URLs are generated.
-- Native source files and exported WhatsApp snapshots are retained to protect drafts, library references and installed-pack reads. Automatic orphan collection and stable in-place WhatsApp updates are follow-up work; changed packs may install as separate revisions.
-- Native compilation is not physical-device acceptance. Validate source persistence, capture/masking, share-sheet delivery, VoiceOver/TalkBack, and WhatsApp acceptance on actual Android and iPhone hardware before releasing.
-- Telegram, iMessage and Snapchat actions are absent. Destination adapters are separated from rendering for later integrations. Snapchat would require its supported sharing flow, not an assumed reusable-chat-pack installer.
+- Automatic cutout targets people (Apple Vision / Android ML Kit). Crop before manual canvas-space corrections. Undo retains 20 session snapshots; saved designs/strokes persist.
+- Video selection is temporary until **Add frames to pack**. Added frame images/timestamps persist; the original video and uncommitted selection do not. Codec support varies by device.
+- Browser images are compacted before storage, but localStorage remains finite. **Not saved** means edits remain only in memory: free space and retry before closing. Clearing app/site storage removes the local workspace; keep intentional backups.
+- Legacy migration preserves the original v1 key and handles repeated sticker IDs across packs. Flattened legacy/rendered-only images cannot regain editable baked-in captions.
+- Beta SQLite is private persistent storage for one service/worker instance. Invite sessions and owner isolation are implemented; self-service account registration, multi-region scaling and cloud library sync are not. Durable generation reservations are configured estimates, not provider bills.
+- Native files and immutable WhatsApp snapshots are retained conservatively. Device upgrade/container-path persistence, storage cleanup, sharing/accessibility and destination behavior need hardware checks. Changed packs may install as new revisions.
+- Telegram has a real Bot API adapter with mock integration coverage; live set creation and recipient installation require credentials and devices. iMessage and Snapchat integrations are absent.
+- Public pages are implemented, not deployed. HTTPS hosting, persistent storage, operational retention/backups, bot configuration and signed phone distribution remain explicit deployment work.
 
-The app does not upload source photos. Review ML Kit SDK privacy terms and OS backup behavior for store disclosures (Android backup is disabled). Use media you have permission to use. Bias Studio is not affiliated with artists or messaging platforms.
+The earlier 1.2 live browser observation used `gpt-image-1.5`; it is **historical evidence only**, not validation of this beta model or service. See [historical verification](docs/VERIFICATION.md) and [earlier generative research](docs/GENERATIVE-UX-RESEARCH.md). OpenAI lists the 1.5 shutdown for December 1, 2026 in its [deprecations](https://developers.openai.com/api/docs/deprecations).
+
+Use media you have permission to use. Review provider, ML Kit and OS backup behavior for disclosures. Bias Studio is not affiliated with artists or messaging platforms.
 
 ## Protocol references
 
-- [WhatsApp Android sticker requirements/provider sample](https://github.com/WhatsApp/stickers/tree/main/Android)
+- [WhatsApp Android requirements/provider sample](https://github.com/WhatsApp/stickers/tree/main/Android)
 - [WhatsApp iOS pasteboard protocol](https://github.com/WhatsApp/stickers/tree/main/iOS)
-- [Apple Vision person segmentation](https://developer.apple.com/documentation/vision/vngeneratepersonsegmentationrequest)
+- [Telegram Bot API](https://core.telegram.org/bots/api#createNewStickerSet)
+- [Apple Vision segmentation](https://developer.apple.com/documentation/vision/vngeneratepersonsegmentationrequest)
 - [ML Kit selfie segmentation](https://developers.google.com/ml-kit/vision/selfie-segmentation/android)

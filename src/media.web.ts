@@ -55,16 +55,8 @@ export async function pickMany(
           reject(new Error("This photo could not be read."));
         reader.readAsDataURL(file);
       });
-      const image = await loadImage(uri);
-      const canvas = document.createElement("canvas");
-      const scale = Math.min(1, 1200 / Math.max(image.width, image.height));
-      canvas.width = image.width * scale;
-      canvas.height = image.height * scale;
-      canvas
-        .getContext("2d")!
-        .drawImage(image, 0, 0, canvas.width, canvas.height);
       items.push({
-        uri: canvas.toDataURL("image/png"),
+        uri: await persistImage(uri),
         kind,
         duration: 0,
         name: file.name,
@@ -74,14 +66,47 @@ export async function pickMany(
   return items;
 }
 export async function persistImage(uri: string) {
+  let image: HTMLImageElement;
   try {
-    await loadImage(uri);
+    image = await loadImage(uri);
   } catch {
     throw new Error(
       "A shared image could not be read. Your existing workspace is unchanged.",
     );
   }
-  return uri;
+  // Keep already compact media byte-for-byte; repeated library reuse must not
+  // repeatedly recompress it. Imported archives receive the same size guard.
+  if (
+    /^data:image\/(png|jpeg|webp);base64,/.test(uri) &&
+    image.width <= 1200 &&
+    image.height <= 1200 &&
+    uri.length <= 128 * 1024
+  ) return uri;
+  const canvas = document.createElement("canvas");
+  return compactSource(canvas, image, image.width, image.height);
+}
+
+/** Bound browser sources before duplicating editable designs in local storage. */
+function compactSource(
+  canvas: HTMLCanvasElement,
+  image: CanvasImageSource,
+  width: number,
+  height: number,
+) {
+  for (const bound of [1200, 900, 675, 512]) {
+    const scale = Math.min(1, bound / Math.max(width, height));
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    canvas.getContext("2d")!.drawImage(image, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.9, 0.8, 0.7, 0.6]) {
+      const data = canvas.toDataURL("image/webp", quality);
+      if (!data.startsWith("data:image/webp"))
+        throw new Error("Update your browser to save compact transparent images, or use the native app.");
+      // 128 KiB of base64 is approximately 96 KiB of encoded image data.
+      if (data.length <= 128 * 1024) return data;
+    }
+  }
+  throw new Error("This image is too detailed for browser storage. Crop it first or import it in the native app.");
 }
 export async function imageData(uri: string) {
   return uri;
@@ -110,18 +135,13 @@ export async function videoFrame(
     };
     video.onseeked = () => {
       const canvas = document.createElement("canvas");
-      const ratio = Math.min(
-        1,
-        1200 / Math.max(video.videoWidth, video.videoHeight),
-      );
-      canvas.width = video.videoWidth * ratio;
-      canvas.height = video.videoHeight * ratio;
-      canvas
-        .getContext("2d")!
-        .drawImage(video, 0, 0, canvas.width, canvas.height);
-      const data = canvas.toDataURL("image/png");
-      clean();
-      resolve(data);
+      try {
+        resolve(compactSource(canvas, video, video.videoWidth, video.videoHeight));
+      } catch (error) {
+        reject(error);
+      } finally {
+        clean();
+      }
     };
     video.src = uri;
   });

@@ -100,13 +100,46 @@ export type Candidate = {
   feeling: Feeling;
   selected: boolean;
   provenance: Provenance;
+  attemptId?: string;
+};
+export const jobStatuses = ["queued", "running", "succeeded", "failed", "cancelled", "interrupted"] as const;
+export type JobStatus = (typeof jobStatuses)[number];
+export type GenerationAttempt = {
+  requestId: string;
+  ownerId?: string;
+  jobId?: string;
+  feeling: Feeling;
+  /** Immutable request snapshot: replay it verbatim after a lost response. */
+  prompt: string;
+  reference?: string;
+  subject: string;
+  look: Look;
+  caption: string;
+  status: JobStatus;
+  error?: string;
+  kept?: boolean;
+  keptReported?: boolean;
+  resultExpired?: boolean;
 };
 export type Creation = Recipe & {
   id: string;
   updatedAt: number;
   candidates: Candidate[];
   saved?: boolean;
+  attempts?: GenerationAttempt[];
+  approvedSampleId?: string;
+  useSampleReference?: boolean;
 };
+export function recoverableAttempts(creation: Creation) {
+  return (creation.attempts || []).filter((attempt) =>
+    ["queued", "running", "succeeded"].includes(attempt.status) && !attempt.resultExpired &&
+    !creation.candidates.some((candidate) => candidate.attemptId === attempt.requestId),
+  );
+}
+export function generationTargets(creation: Creation, requested: Feeling[]): Feeling[] {
+  const approved = creation.candidates.some((c) => c.id === creation.approvedSampleId);
+  return requested.slice(0, approved ? 24 - creation.candidates.length : Math.min(1, 24 - creation.candidates.length));
+}
 export const newCreation = (recipe?: Recipe): Creation => ({
   prompt: "",
   look: "pop",
@@ -145,7 +178,7 @@ const image = (v: unknown): v is string =>
   typeof v === "string" &&
   /^(file:\/\/|data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$)/.test(v);
 const identifier = (v: unknown): v is string =>
-  typeof v === "string" && /^[a-zA-Z0-9-]{1,120}$/.test(v);
+  typeof v === "string" && /^[a-zA-Z0-9_-]{1,120}$/.test(v);
 export const isFeeling = (v: unknown): v is Feeling =>
   feelings.some((f) => f.id === v);
 export const isLook = (v: unknown): v is Look => looks.some((l) => l.id === v);
@@ -174,6 +207,19 @@ export function validCreation(v: unknown): v is Creation {
     Number.isFinite(v.updatedAt) &&
     v.updatedAt >= 0 &&
     (v.saved === undefined || typeof v.saved === "boolean") &&
+    (v.approvedSampleId === undefined || identifier(v.approvedSampleId)) &&
+    (v.useSampleReference === undefined || typeof v.useSampleReference === "boolean") &&
+    (v.attempts === undefined || (Array.isArray(v.attempts) && v.attempts.length <= 120 &&
+      new Set(v.attempts.map((a: any) => a?.requestId)).size === v.attempts.length &&
+      v.attempts.every((a: any) => record(a) && identifier(a.requestId) && a.requestId.length >= 8 &&
+        (a.ownerId === undefined || identifier(a.ownerId)) &&
+        (a.jobId === undefined || identifier(a.jobId)) && isFeeling(a.feeling) &&
+        text(a.prompt, 4000) && a.prompt.length > 0 && text(a.subject, 1200) && isLook(a.look) && text(a.caption, 28) &&
+        (a.reference === undefined || (image(a.reference) && a.reference.startsWith("data:") && a.reference.length <= 8 * 1024 * 1024)) &&
+        jobStatuses.includes(a.status) && (a.error === undefined || text(a.error, 1000)) &&
+        (a.kept === undefined || typeof a.kept === "boolean") &&
+        (a.keptReported === undefined || typeof a.keptReported === "boolean") &&
+        (a.resultExpired === undefined || typeof a.resultExpired === "boolean")))) &&
     Array.isArray(v.candidates) &&
     v.candidates.length <= 24 &&
     new Set(v.candidates.map((c: any) => c?.id)).size === v.candidates.length &&
@@ -185,6 +231,7 @@ export function validCreation(v: unknown): v is Creation {
         text(c.caption, 28) &&
         isFeeling(c.feeling) &&
         typeof c.selected === "boolean" &&
+        (c.attemptId === undefined || identifier(c.attemptId)) &&
         validProvenance(c.provenance),
     )
   );

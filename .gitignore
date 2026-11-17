@@ -50,3 +50,10 @@ playwright-report/
 *.aab
 **/build/
 **/.gradle/
+
+# Private beta database and operator output
+server/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.invite

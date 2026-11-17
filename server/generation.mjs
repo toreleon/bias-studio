@@ -86,7 +86,24 @@ export async function openAIImage(
     !/^[A-Za-z0-9+/=]+$/.test(image)
   )
     throw new ServiceError(502, "The provider returned an unreadable image.");
-  return { image: `data:image/png;base64,${image}`, model };
+  // Retain only documented numerical usage counters, never arbitrary provider text.
+  const usage = {};
+  for (const key of ["total_tokens", "input_tokens", "output_tokens"]) {
+    if (Number.isSafeInteger(result.usage?.[key]) && result.usage[key] >= 0)
+      usage[key] = result.usage[key];
+  }
+  for (const key of ["input_tokens_details", "output_tokens_details"]) {
+    const details = {};
+    for (const counter of ["text_tokens", "image_tokens", "cached_tokens"]) {
+      if (Number.isSafeInteger(result.usage?.[key]?.[counter]) && result.usage[key][counter] >= 0)
+        details[counter] = result.usage[key][counter];
+    }
+    if (Object.keys(details).length) usage[key] = details;
+  }
+  return {
+    image: `data:image/png;base64,${image}`, model,
+    ...(Object.keys(usage).length ? { usage } : {}),
+  };
 }
 export function createGenerationServer({
   apiKey = process.env.OPENAI_API_KEY,

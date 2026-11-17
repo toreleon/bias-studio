@@ -4,6 +4,7 @@ import * as FS from "expo-file-system/legacy";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as Sharing from "expo-sharing";
 import { captureRef } from "react-native-view-shot";
+import { Platform } from "react-native";
 import { nativeBridge } from "./bridge";
 import {
   LIMITS,
@@ -175,22 +176,38 @@ export async function renderSticker(
   }
 }
 
+export class WhatsAppExportError extends Error {
+  constructor(
+    public readonly code: "INVALID_PACK" | "UNAVAILABLE" | "PREPARATION_FAILED" | "HANDOFF_FAILED",
+    message: string,
+  ) {
+    super(message);
+    this.name = "WhatsAppExportError";
+  }
+}
+
 export async function exportWhatsApp(pack: Pack) {
   const problems = packProblems(pack);
-  if (problems.length) throw new Error(problems[0]);
+  if (problems.length) throw new WhatsAppExportError("INVALID_PACK", problems[0]);
   if (!nativeBridge)
-    throw new Error(
+    throw new WhatsAppExportError("UNAVAILABLE",
       "Open Bias Studio in its native development build to add this pack to WhatsApp.",
     );
-  const tray = await ImageManipulator.manipulateAsync(
-    pack.stickers[0].uri,
-    [{ resize: { width: 96, height: 96 } }],
-    { format: ImageManipulator.SaveFormat.PNG },
-  );
+  let tray: ImageManipulator.ImageResult;
+  try {
+    tray = await ImageManipulator.manipulateAsync(
+      pack.stickers[0].uri,
+      [{ resize: { width: 96, height: 96 } }],
+      { format: ImageManipulator.SaveFormat.PNG },
+    );
+  } catch {
+    throw new WhatsAppExportError("PREPARATION_FAILED",
+      "The first sticker could not be read to make a pack icon. Reopen that sticker, replace its photo if missing, then retry. Your draft is unchanged.");
+  }
   try {
     const trayInfo = await FS.getInfoAsync(tray.uri);
     if (!trayInfo.exists || trayInfo.size > LIMITS.trayBytes)
-      throw new Error(
+      throw new WhatsAppExportError("INVALID_PACK",
         "The pack icon is too large. Use a simpler first sticker.",
       );
     const opened = await nativeBridge.exportPack(
@@ -200,9 +217,26 @@ export async function exportWhatsApp(pack: Pack) {
         trayUri: tray.uri,
       }),
     );
-    if (!opened) throw new Error("Install WhatsApp to add this sticker pack.");
+    if (!opened) throw new WhatsAppExportError("UNAVAILABLE",
+      Platform.OS === "ios"
+        ? "WhatsApp could not open on this iPhone. Install or update WhatsApp, open it once, then return here and retry. The pack has not been installed."
+        : "No supported WhatsApp app could open this pack. Install or update WhatsApp or WhatsApp Business, open it once, then return here and retry. The pack has not been installed.");
+  } catch (error) {
+    if (error instanceof WhatsAppExportError) throw error;
+    const reason = error instanceof Error ? error.message : "";
+    if (/missing|not found|ENOENT|outside app|local images|could not read/i.test(reason))
+      throw new WhatsAppExportError("PREPARATION_FAILED",
+        "A sticker file could not be read. Reopen the affected sticker, replace any missing photo, and retry. Your draft is unchanged.");
+    if (/dimensions|encoding|size limit|WebP|PNG|pack name|publisher|3.?30/i.test(reason))
+      throw new WhatsAppExportError("INVALID_PACK",
+        "WhatsApp could not use the prepared images or pack details. Check the name and creator credit, use 3–30 still stickers, and try a simpler crop or first sticker before retrying.");
+    throw new WhatsAppExportError("HANDOFF_FAILED",
+      Platform.OS === "ios"
+        ? "The WhatsApp handoff did not finish. Keep both apps open, allow the paste request if iOS asks, then retry and confirm Add in WhatsApp. Your draft is safe; installation is not confirmed."
+        : "The WhatsApp handoff did not finish. Open or update WhatsApp, return here and retry, then confirm Add there. Your draft is safe; installation is not confirmed.");
   } finally {
-    await FS.deleteAsync(tray.uri, { idempotent: true });
+    // Cleanup must not turn an opened destination into a false export failure.
+    await FS.deleteAsync(tray.uri, { idempotent: true }).catch(() => {});
   }
 }
 export async function shareSticker(sticker: Sticker) {

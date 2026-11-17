@@ -14,7 +14,7 @@ export async function sharePackFile(bytes: Uint8Array, id: string) {
   await Sharing.shareAsync(uri, {
     mimeType: "application/zip",
     UTI: "public.zip-archive",
-    dialogTitle: "Share editable reaction pack",
+    dialogTitle: "Share reaction pack",
   });
   // Keep the cache file: Android recipients may read it after the chooser returns.
   // The OS may evict it later; this is not a delivery receipt.

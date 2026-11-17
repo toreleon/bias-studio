@@ -189,10 +189,30 @@ function migratePack(pack: Pack): Collection {
 export function migrate(value: unknown): Workspace {
   if (isLibrary(value)) {
     const collections = value.packs.map(migratePack);
+    // The old format allowed one sticker to appear in several packs. Keep
+    // those packs intact while giving the reusable library unique identities.
+    const assets: Reaction[] = [];
+    const reserved = new Set(collections.flatMap((p) => p.items.map((i) => i.id)));
+    const versions = new Map<string, Set<string>>();
+    let suffix = 0;
+    for (const item of collections.flatMap((p) => p.items)) {
+      const content = JSON.stringify(item);
+      const seen = versions.get(item.id);
+      if (seen?.has(content)) continue;
+      let assetId = item.id;
+      if (seen) {
+        do {
+          assetId = `legacy-asset-${++suffix}`;
+        } while (reserved.has(assetId));
+        reserved.add(assetId);
+      }
+      assets.push({ ...item, id: assetId });
+      versions.set(item.id, new Set([...(seen || []), content]));
+    }
     return {
       version: 2,
       collections,
-      assets: collections.flatMap((p) => p.items),
+      assets,
       styles: [],
     };
   }
