@@ -18,28 +18,70 @@ export interface Media {
   uri: string;
   kind: "photo" | "video";
   duration: number;
+  name?: string;
 }
 export async function pickMedia(kind: Media["kind"]): Promise<Media | null> {
+  return (await pickMany(kind, 1))[0] || null;
+}
+export async function pickMany(
+  kind: Media["kind"],
+  limit = 30,
+): Promise<Media[]> {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: kind === "video" ? ["videos"] : ["images"],
     quality: 1,
-    allowsEditing: kind === "photo",
+    allowsEditing: false,
+    allowsMultipleSelection: kind === "photo",
+    selectionLimit: limit,
+    orderedSelection: true,
     exif: false,
   });
-  if (result.canceled || !result.assets[0]) return null;
-  const asset = result.assets[0];
-  if (kind === "video")
-    return {
-      uri: asset.uri,
-      kind,
-      duration: Math.max(0, (asset.duration || 0) / 1000),
-    };
-  const resized = await ImageManipulator.manipulateAsync(
-    asset.uri,
-    [{ resize: boundedDimensions(asset.width, asset.height) }],
-    { format: ImageManipulator.SaveFormat.PNG },
-  );
-  return { uri: resized.uri, kind, duration: 0 };
+  if (result.canceled) return [];
+  if (result.assets.length > limit)
+    throw new Error(`Choose up to ${limit} photos for this pack.`);
+  const items: Media[] = [];
+  for (const asset of result.assets) {
+    if (kind === "video")
+      items.push({
+        uri: asset.uri,
+        kind,
+        duration: Math.max(0, (asset.duration || 0) / 1000),
+        name: asset.fileName || "Video",
+      });
+    else {
+      const resized = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: boundedDimensions(asset.width, asset.height) }],
+        { format: ImageManipulator.SaveFormat.PNG },
+      );
+      items.push({
+        uri: await persistImage(resized.uri),
+        kind,
+        duration: 0,
+        name: asset.fileName || "Photo",
+      });
+    }
+  }
+  return items;
+}
+export async function persistImage(uri: string): Promise<string> {
+  const root = `${FS.documentDirectory}sources/`;
+  if (uri.startsWith(root)) return uri;
+  await FS.makeDirectoryAsync(root, { intermediates: true });
+  const output = `${root}${newId()}.${uri.startsWith("data:image/webp") || uri.endsWith(".webp") ? "webp" : "png"}`;
+  if (uri.startsWith("data:"))
+    await FS.writeAsStringAsync(output, uri.split(",")[1], {
+      encoding: FS.EncodingType.Base64,
+    });
+  else await FS.copyAsync({ from: uri, to: output });
+  return output;
+}
+export async function imageData(uri: string): Promise<string> {
+  if (!uri || uri.startsWith("data:")) return uri;
+  const data = await FS.readAsStringAsync(uri, {
+    encoding: FS.EncodingType.Base64,
+  });
+  return `data:image/${uri.endsWith(".webp") ? "webp" : "png"};base64,${data}`;
 }
 export async function videoFrame(
   uri: string,
@@ -54,17 +96,20 @@ export async function videoFrame(
     [{ resize: boundedDimensions(frame.width, frame.height) }],
     { format: ImageManipulator.SaveFormat.PNG },
   );
-  return resized.uri;
+  return persistImage(resized.uri);
 }
 function boundedDimensions(width: number, height: number) {
   const scale = Math.min(1, 1200 / Math.max(width || 1200, height || 1200));
-  return { width: Math.max(1, Math.round((width || 1200) * scale)), height: Math.max(1, Math.round((height || 1200) * scale)) };
+  return {
+    width: Math.max(1, Math.round((width || 1200) * scale)),
+    height: Math.max(1, Math.round((height || 1200) * scale)),
+  };
 }
 export const cutoutAvailable = !!nativeBridge;
 export async function removeBackground(uri: string) {
   if (!nativeBridge)
     throw new Error("Person cutout needs the native development build.");
-  return nativeBridge.removeBackground(uri);
+  return persistImage(await nativeBridge.removeBackground(uri));
 }
 export async function renderSticker(
   design: StickerDesign,
@@ -78,39 +123,44 @@ export async function renderSticker(
     height: 512,
   });
   let result: ImageManipulator.ImageResult | undefined;
-  let bytes = 0;
-  for (const compress of [0.95, 0.8, 0.6, 0.4, 0.2, 0.08]) {
-    if (result) await FS.deleteAsync(result.uri, { idempotent: true });
-    result = await ImageManipulator.manipulateAsync(
-      shot,
-      [{ resize: { width: 512, height: 512 } }],
-      { format: ImageManipulator.SaveFormat.WEBP, compress },
-    );
-    const info = await FS.getInfoAsync(result.uri);
-    bytes = info.exists ? info.size : 0;
-    if (bytes > 0 && bytes <= LIMITS.stickerBytes) break;
+  try {
+    let bytes = 0;
+    for (const compress of [0.95, 0.8, 0.6, 0.4, 0.2, 0.08]) {
+      if (result) await FS.deleteAsync(result.uri, { idempotent: true });
+      result = await ImageManipulator.manipulateAsync(
+        shot,
+        [{ resize: { width: 512, height: 512 } }],
+        { format: ImageManipulator.SaveFormat.WEBP, compress },
+      );
+      const info = await FS.getInfoAsync(result.uri);
+      bytes = info.exists ? info.size : 0;
+      if (bytes > 0 && bytes <= LIMITS.stickerBytes) break;
+    }
+    if (!result || !bytes || bytes > LIMITS.stickerBytes)
+      throw new Error(
+        "This image is too detailed for WhatsApp. Try a closer crop or a cutout.",
+      );
+    const id = newId();
+    const root = `${FS.documentDirectory}stickers/`;
+    await FS.makeDirectoryAsync(root, { intermediates: true });
+    const uri = `${root}${id}.webp`;
+    await FS.copyAsync({ from: result.uri, to: uri });
+    return {
+      id,
+      uri,
+      caption: design.caption,
+      bytes,
+      width: 512,
+      height: 512,
+      createdAt: Date.now(),
+    };
+  } finally {
+    await FS.deleteAsync(shot, { idempotent: true }).catch(() => {});
+    if (result)
+      await FS.deleteAsync(result.uri, { idempotent: true }).catch(() => {});
   }
-  await FS.deleteAsync(shot, { idempotent: true });
-  if (!result || !bytes || bytes > LIMITS.stickerBytes)
-    throw new Error(
-      "This image is too detailed for WhatsApp. Try a closer crop or a cutout.",
-    );
-  const id = newId();
-  const root = `${FS.documentDirectory}stickers/`;
-  await FS.makeDirectoryAsync(root, { intermediates: true });
-  const uri = `${root}${id}.webp`;
-  await FS.copyAsync({ from: result.uri, to: uri });
-  await FS.deleteAsync(result.uri, { idempotent: true });
-  return {
-    id,
-    uri,
-    caption: design.caption,
-    bytes,
-    width: 512,
-    height: 512,
-    createdAt: Date.now(),
-  };
 }
+
 export async function exportWhatsApp(pack: Pack) {
   const problems = packProblems(pack);
   if (problems.length) throw new Error(problems[0]);
@@ -123,18 +173,23 @@ export async function exportWhatsApp(pack: Pack) {
     [{ resize: { width: 96, height: 96 } }],
     { format: ImageManipulator.SaveFormat.PNG },
   );
-  const trayInfo = await FS.getInfoAsync(tray.uri);
-  if (!trayInfo.exists || trayInfo.size > LIMITS.trayBytes)
-    throw new Error("The pack icon is too large. Use a simpler first sticker.");
-  const opened = await nativeBridge.exportPack(
-    JSON.stringify({
-      ...pack,
-      id: `${pack.id}-${pack.updatedAt.toString(36)}`,
-      trayUri: tray.uri,
-    }),
-  );
-  await FS.deleteAsync(tray.uri, { idempotent: true });
-  if (!opened) throw new Error("Install WhatsApp to add this sticker pack.");
+  try {
+    const trayInfo = await FS.getInfoAsync(tray.uri);
+    if (!trayInfo.exists || trayInfo.size > LIMITS.trayBytes)
+      throw new Error(
+        "The pack icon is too large. Use a simpler first sticker.",
+      );
+    const opened = await nativeBridge.exportPack(
+      JSON.stringify({
+        ...pack,
+        id: `${pack.id}-${pack.updatedAt.toString(36)}`,
+        trayUri: tray.uri,
+      }),
+    );
+    if (!opened) throw new Error("Install WhatsApp to add this sticker pack.");
+  } finally {
+    await FS.deleteAsync(tray.uri, { idempotent: true });
+  }
 }
 export async function shareSticker(sticker: Sticker) {
   if (!(await Sharing.isAvailableAsync()))

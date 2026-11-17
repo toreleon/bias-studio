@@ -2,7 +2,7 @@
   "expo": {
     "name": "Bias Studio",
     "slug": "bias-studio",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -16,7 +16,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "studio.bias.app",
       "infoPlist": {
-        "LSApplicationQueriesSchemes": ["whatsapp"],
+        "LSApplicationQueriesSchemes": [
+          "whatsapp"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -28,7 +30,9 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "studio.bias.app",
-      "blockedPermissions": ["android.permission.RECORD_AUDIO"],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "allowBackup": false
     },
     "web": {
@@ -43,7 +47,8 @@
           "cameraPermission": false,
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-router"
     ],
     "scheme": "biasstudio"
   }

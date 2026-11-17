@@ -17,6 +17,18 @@ export interface StickerDesign {
   y: number;
   decoration: "sparkles" | "hearts" | "none";
   sample?: Mood;
+  font?: "rounded" | "serif" | "mono";
+  captionColor?: string;
+  captionPosition?: "top" | "middle" | "bottom";
+  outline?: number;
+  outlineColor?: string;
+  originalSource?: string;
+  flattened?: boolean;
+  strokes?: {
+    mode: "erase" | "restore";
+    radius: number;
+    points: { x: number; y: number }[];
+  }[];
 }
 export interface Sticker {
   id: string;
