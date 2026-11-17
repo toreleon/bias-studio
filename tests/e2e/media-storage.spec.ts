@@ -31,6 +31,9 @@ test("detailed transparent photos are compact before autosave and survive librar
     mimeType: "image/png",
     buffer: Buffer.from(original.split(",")[1], "base64"),
   })));
+  // Three camera-sized noisy PNGs require real WebP compression. Wait for
+  // bounded import completion rather than the default 5s navigation assertion.
+  await expect(page.getByTestId("workspace-progress-overlay")).toHaveCount(0, { timeout: 30000 });
   await expect(page.getByText("3 / 30 REACTIONS · PRIVATE DRAFT")).toBeVisible();
   await expect(page.getByRole("button", { name: "Saved on this device", exact: true })).toBeVisible();
   const stored = await page.evaluate(() => {

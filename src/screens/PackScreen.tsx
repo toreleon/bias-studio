@@ -33,6 +33,7 @@ import { Media, pickMany, videoFrame } from "../media";
 import { StyleControls } from "../StyleControls";
 import Slider from "../Range";
 import { takeImport } from "../import-inbox";
+import { waitForImport } from "../import-task";
 
 type Frame = { uri: string; seconds: number };
 export function PackScreen() {
@@ -65,13 +66,13 @@ export function PackScreen() {
       kind === "photo"
         ? "Importing your photos…"
         : "Finding moments in your video…",
-      async () => {
+      async (task) => {
         const remaining = 30 - pack.items.length;
         if (remaining <= 0)
           throw new Error(
             "This pack has 30 reactions. Start another pack for more.",
           );
-        const media = takeImport(id) ?? (await pickMany(kind, remaining));
+        const media = takeImport(id) ?? (await pickMany(kind, remaining, task));
         if (!media.length) return;
         if (kind === "photo") {
           const items = media.map((m) =>
@@ -95,7 +96,7 @@ export function PackScreen() {
               10;
             if (candidates.some((f) => f.seconds === seconds)) continue;
             candidates.push({
-              uri: await videoFrame(clip.uri, seconds),
+              uri: await waitForImport(videoFrame(clip.uri, seconds), task, 45000, "This video frame took too long. Your pack is safe; try a shorter clip."),
               seconds,
             });
           }
@@ -105,6 +106,7 @@ export function PackScreen() {
           setFrames([]);
         }
       },
+      { cancellable: true },
     );
   }
   const importRef = useRef(importMedia);

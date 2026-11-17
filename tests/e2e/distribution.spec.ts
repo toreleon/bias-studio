@@ -163,7 +163,7 @@ test("publishing sends finished images only; an anonymous recipient imports a re
   await page.getByRole("button", { name: "Got it", exact: true }).click();
   await expect(page.getByRole("button", { name: "Open public collection page", exact: true })).toBeVisible();
   expect(publishCalls).toBe(1);
-  const recipientContext = await browser.newContext({ baseURL: "http://localhost:8081" });
+  const recipientContext = await browser.newContext({ baseURL: new URL(page.url()).origin });
   try {
     const recipient = await recipientContext.newPage();
     await recipient.route(`${origin}/**`, routePublic);

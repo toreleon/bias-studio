@@ -20,7 +20,9 @@ The SDK 58 local Android check uses the existing JDK 17, Android SDK, and Gradle
 
 - Android SDK platform 37.0, Build Tools 37.0.0, and CMake 3.30.5 installed successfully. NDK 27.1.12297006 and CMake 3.22.1 were already available.
 - Workflow syntax/security validation passed with the existing pinned actionlint/zizmor checks.
-- Android Release compilation and release lint: in progress; final result will be recorded before this upgrade is reported complete.
+- Android ARM64 Release compilation and release lint passed on 2026-11-18 (client local date): `:app:assembleRelease :app:lintVitalRelease`, 968 executed tasks, 14 minutes 49 seconds. The custom `fan-stickers` module compiled successfully, and R8 minification remained enabled. No native module source changes or generated-project patches were needed.
+- The resulting local APK is `android/app/build/outputs/apk/release/app-release.apk` (46,649,994 bytes). Build Tools 37.0.0 `apksigner verify --verbose` passed (APK Signature Scheme v2). SHA-256: `54be016515841e328d7b094b66cf52723b84b35aafcdc11856984ea118c12571`. This is a debug-key-signed test APK, not a store release or proof of real-device installation.
+- Lint and TypeScript checks passed after the SDK upgrade. Upstream Gradle/Android API deprecation warnings remain; the build does not suppress native failures or disable release lint.
 - iOS native compilation requires the macOS CI runner. This Linux workspace cannot execute Xcode. A green simulator build still does not verify real-device WhatsApp handoff or person segmentation.
 
 Expo Go can exercise the JavaScript workspace and Expo-bundled modules after the SDK alignment. The custom `fan-stickers` module is not part of Expo Go; native person cutout and WhatsApp pack installation continue to require a development/standalone build and physical-device validation.

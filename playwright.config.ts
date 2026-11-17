@@ -1,4 +1,7 @@
 import { defineConfig } from "@playwright/test";
+const port = Number(process.env.E2E_PORT || 8081);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("E2E_PORT must be a valid TCP port.");
+const baseURL = `http://localhost:${port}`;
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 60000,
@@ -13,7 +16,7 @@ export default defineConfig({
       ]
     : "list",
   use: {
-    baseURL: "http://localhost:8081",
+    baseURL,
     headless: true,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
@@ -23,9 +26,9 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: "npx expo start --web --port 8081",
-    env: { EXPO_PUBLIC_GENERATION_URL: "http://localhost:8787" },
-    url: "http://localhost:8081",
+    command: `npx expo start --web --port ${port}`,
+    env: { EXPO_PUBLIC_BETA_URL: "http://localhost:8787", EXPO_PUBLIC_GENERATION_URL: "http://localhost:8787" },
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
